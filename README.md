@@ -13,6 +13,7 @@ The primary motivation to write a VL53L0X driver is to bypass the heavy, abstrac
 ## Linked Resources
 * [VL53L0X Sensor Product Page](https://www.st.com/en/imaging-and-photonics-solutions/vl53l0x.html)
 * [Partial Sensor Register Map Reference](https://github.com/GrimbiXcode/VL53L0X-Register-Map)
+* [MSP432P4xx Family Technical Reference](https://github.com/YuetongFang/MSP432/blob/main/MSP432P4xx%20Family%20Technical%20Reference%20Manual.pdf)
 
 ## Acknowledgements
 This repository is a fork and readaptation of @artfulbytes's original project, refactored specifically for the MSP432P401R architecture and a single sensor setup.
