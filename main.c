@@ -1,10 +1,9 @@
-#include <msp430.h>
+#include <msp432.h>
 #include "drivers/i2c.h"
 #include "drivers/vl6180x.h"
 #include "drivers/vl53l0x.h"
 
-#define VL53L0X
-//#define VL61L0X
+#define __MSP432P401R__
 
 static void msp430_init()
 {

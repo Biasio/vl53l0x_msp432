@@ -1,271 +1,160 @@
 #include "i2c.h"
-#include <msp430.h>
+#include <msp432.h>
+#include <stddef.h>
 
-#define DEFAULT_SLAVE_ADDRESS (0x29)
 
-typedef enum
+static bool start_transfer(uint16_t addr, uint8_t addr_len)
 {
-    ADDR_SIZE_8BIT,
-    ADDR_SIZE_16BIT
-} addr_size_t;
+    USCI_REG(EUSCI_SEL,CTL1) |= UCTXSTT + UCTR; /* Set up master as TX and send start condition */
 
-typedef enum
-{
-    REG_SIZE_8BIT,
-    REG_SIZE_16BIT,
-    REG_SIZE_32BIT
-} reg_size_t;
-
-static bool start_transfer(addr_size_t addr_size, uint16_t addr)
-{
-    bool success = false;
-    UCB0CTL1 |= UCTXSTT + UCTR; /* Set up master as TX and send start condition */
-
-    /* Note, when master is TX, we must write to TXBUF before waiting for UCTXSTT */
-    switch (addr_size) {
-    case ADDR_SIZE_8BIT:
-        UCB0TXBUF = addr & 0xFF;
-        break;
-    case ADDR_SIZE_16BIT:
-        UCB0TXBUF = (addr >> 8) & 0xFF; /* Send the most significant byte of the 16-bit address */
-        break;
+    /* Send MSB first if 16-bit address */
+    if (addr_len == 2) {
+        USCI_REG(EUSCI_SEL,TXBUF) = (addr >> 8) & 0xFF; //MSB
+        while (USCI_REG(EUSCI_SEL,CTL1) & UCTXSTT); /* Wait for start condition to be sent */
+        if (USCI_REG(EUSCI_SEL,STAT) & UCNACKIFG) return false; 
+        while (!(IFG2 & USCI_REG(EUSCI_SEL,TXIFG))); /* Wait for byte to be sent */
+        if (USCI_REG(EUSCI_SEL,STAT) & UCNACKIFG) return false;
     }
 
-    while (UCB0CTL1 & UCTXSTT); /* Wait for start condition to be sent */
-    success = !(UCB0STAT & UCNACKIFG);
-    if (success) {
-        while (!(IFG2 & UCB0TXIFG)); /* Wait for byte to be sent */
-        success = !(UCB0STAT & UCNACKIFG);
+    /* Send LSB (or 8-bit address) */
+    USCI_REG(EUSCI_SEL,TXBUF) = addr & 0xFF;
+    if (addr_len == 1) {
+        while (USCI_REG(EUSCI_SEL,CTL1) & UCTXSTT);
     }
-
-    if (success) {
-        switch (addr_size) {
-        case ADDR_SIZE_8BIT:
-            break;
-        case ADDR_SIZE_16BIT:
-            UCB0TXBUF = addr & 0xFF; /* Send the least significant byte of the 16-bit address */
-            while (!(IFG2 & UCB0TXIFG)); /* Wait for byte to be sent */
-            success = !(UCB0STAT & UCNACKIFG);
-            break;
-        }
-    }
-    return success;
+    if (USCI_REG(EUSCI_SEL,STAT) & UCNACKIFG) return false;
+    
+    while (!(IFG2 & USCI_REG(EUSCI_SEL,TXIFG)));
+    return !(USCI_REG(EUSCI_SEL,STAT) & UCNACKIFG);
 }
 
 static void stop_transfer()
 {
-    UCB0CTL1 |= UCTXSTP; /* Send stop condition */
-    while (UCB0CTL1 & UCTXSTP); /* Wait for stop condition to be sent */
+    USCI_REG(EUSCI_SEL,CTL1) |= UCTXSTP;
+    while (USCI_REG(EUSCI_SEL,CTL1) & UCTXSTP);
 }
 
-/* Read a register of size reg_size at address addr.
- * NOTE: The bytes are read from MSB to LSB. */
-static bool read_reg(addr_size_t addr_size, uint16_t addr, reg_size_t reg_size, uint8_t *data)
+static bool i2c_read_core(uint16_t addr, uint8_t addr_len, uint8_t *data, uint16_t len)
 {
-    bool success = false;
+    if (!start_transfer(addr, addr_len)) return false;
 
-    if (!start_transfer(addr_size, addr)) {
-        return false;
-    }
+    USCI_REG(EUSCI_SEL,CTL1) &= ~UCTR;   /* Configure as receiver */
+    USCI_REG(EUSCI_SEL,CTL1) |= UCTXSTT; /* Send RESTART condition */
+    while (USCI_REG(EUSCI_SEL,CTL1) & UCTXSTT); 
+    if (USCI_REG(EUSCI_SEL,STAT) & UCNACKIFG) return false;
 
-    /* Address sent, now configure as receiver and get the data */
-    UCB0CTL1 &= ~UCTR; /* Set as a receiver */
-    UCB0CTL1 |= UCTXSTT; /* Send (repeating) start condition (including address of slave) */
-    while (UCB0CTL1 & UCTXSTT); /* Wait for start condition to be sent */
-    success = !(UCB0STAT & UCNACKIFG);
-    if (success) {
-        switch (reg_size) {
-        case REG_SIZE_8BIT:
-            break;
-        case REG_SIZE_16BIT:
-            /* Bytes are read from most to least significant */
-            while ((IFG2 & UCB0RXIFG) == 0); /* Wait for byte before reading the buffer */
-            data[1] = UCB0RXBUF; /* RX interrupt is cleared automatically afterwards */
-            break;
-        case REG_SIZE_32BIT:
-            /* Bytes are read from most to least significant */
-            while ((IFG2 & UCB0RXIFG) == 0);
-            data[3] = UCB0RXBUF;
-            while ((IFG2 & UCB0RXIFG) == 0);
-            data[2] = UCB0RXBUF;
-            while ((IFG2 & UCB0RXIFG) == 0);
-            data[1] = UCB0RXBUF;
-            break;
+    for (uint16_t i = 0; i < len; i++) {
+        if (i == len - 1) {
+            USCI_REG(EUSCI_SEL,CTL1) |= UCTXSTP; /* Send stop before reading the last byte */
         }
-        stop_transfer();
-        while ((IFG2 & UCB0RXIFG) == 0); /* Wait for byte before reading the buffer */
-        data[0] = UCB0RXBUF; /* RX interrupt is cleared automatically afterwards */
+        while (!(IFG2 & USCI_REG(EUSCI_SEL,RXIFG)));
+        data[i] = USCI_REG(EUSCI_SEL,RXBUF); 
     }
-
-    return success;
+    return true;
 }
 
-static bool read_reg_bytes(addr_size_t addr_size, uint16_t addr, uint8_t *bytes, uint16_t byte_count)
+static bool i2c_write_core(uint16_t addr, uint8_t addr_len, const uint8_t *data, uint16_t len)
 {
-    bool success = false;
-    bool transfer_stopped = false;
+    if (!start_transfer(addr, addr_len)) return false;
 
-    if (!start_transfer(addr_size, addr)) {
-        return false;
-    }
-
-    /* Address sent, now configure as receiver and get the value */
-    UCB0CTL1 &= ~UCTR; /* Set as a receiver */
-    UCB0CTL1 |= UCTXSTT; /* Send (repeating) start condition (including address of slave) */
-    while (UCB0CTL1 & UCTXSTT); /* Wait for start condition to be sent */
-    success = !(UCB0STAT & UCNACKIFG);
-    if (success) {
-        for (int i = 0; i < byte_count; i++) {
-            if (i + 1 == byte_count) {
-                stop_transfer();
-                transfer_stopped = true;
-            }
-            success = !(UCB0STAT & UCNACKIFG);
-            if (success) {
-                while ((IFG2 & UCB0RXIFG) == 0); /* Wait for byte before reading the buffer */
-                bytes[i] = UCB0RXBUF; /* RX interrupt is cleared automatically afterwards */
-            } else {
-                break;
-            }
+    for (uint16_t i = 0; i < len; i++) {
+        USCI_REG(EUSCI_SEL,TXBUF) = data[i];
+        while (!(IFG2 & USCI_REG(EUSCI_SEL,TXIFG)));
+        if (USCI_REG(EUSCI_SEL,STAT) & UCNACKIFG) {
+            stop_transfer();
+            return false;
         }
     }
-    if (!transfer_stopped) {
-        stop_transfer();
-    }
-
-    return success;
-}
-
-bool i2c_read_addr8_data8(uint8_t addr, uint8_t *data)
-{
-    return read_reg(ADDR_SIZE_8BIT, addr, REG_SIZE_8BIT, data);
-}
-
-bool i2c_read_addr8_data16(uint8_t addr, uint16_t *data)
-{
-    return read_reg(ADDR_SIZE_8BIT, addr, REG_SIZE_16BIT, (uint8_t *)data);
-}
-
-bool i2c_read_addr16_data8(uint16_t addr, uint8_t *data)
-{
-    return read_reg(ADDR_SIZE_16BIT, addr, REG_SIZE_8BIT, data);
-}
-
-bool i2c_read_addr16_data16(uint16_t addr, uint16_t *data)
-{
-    return read_reg(ADDR_SIZE_16BIT, addr, REG_SIZE_16BIT, (uint8_t *)data);
-}
-
-bool i2c_read_addr8_data32(uint16_t addr, uint32_t *data)
-{
-    return read_reg(ADDR_SIZE_8BIT, addr, REG_SIZE_32BIT, (uint8_t *)data);
-}
-
-bool i2c_read_addr16_data32(uint16_t addr, uint32_t *data)
-{
-    return read_reg(ADDR_SIZE_16BIT, addr, REG_SIZE_32BIT, (uint8_t *)data);
-}
-
-bool i2c_read_addr8_bytes(uint8_t start_addr, uint8_t *bytes, uint16_t byte_count)
-{
-    return read_reg_bytes(ADDR_SIZE_8BIT, start_addr, bytes, byte_count);
-}
-
-/* Write data to a register of size reg_size at address addr.
- * NOTE: Writes the most significant byte (MSB) first. */
-static bool write_reg(addr_size_t addr_size, uint16_t addr, reg_size_t reg_size, uint16_t data)
-{
-    bool success = false;
-
-    if (!start_transfer(addr_size, addr)) {
-        return false;
-    }
-
-    switch (reg_size) {
-    case REG_SIZE_8BIT:
-        success = true;
-        break;
-    case REG_SIZE_16BIT:
-        UCB0TXBUF = (data >> 8) & 0xFF; /* Start with the most significant byte */
-        while (!(IFG2 & UCB0TXIFG)); /* Wait for byte to be sent */
-        success = !(UCB0STAT & UCNACKIFG);
-        break;
-    case REG_SIZE_32BIT:
-        /* Not supported */
-        return false;
-    }
-
-    if (success) {
-        UCB0TXBUF = 0xFF & data; /* Send the least significant byte */
-        while (!(IFG2 & UCB0TXIFG)); /* Wait for byte to be sent */
-        success = !(UCB0STAT & UCNACKIFG);
-    }
-
     stop_transfer();
-    return success;
+    return true;
 }
 
-static bool write_reg_bytes(addr_size_t addr_size, uint16_t addr, uint8_t *bytes, uint16_t byte_count)
+
+void i2c_init()
 {
-    bool success = false;
+    // Primary function selection -> I2C
+    P6SEL0 |= BIT5 + BIT4;
+    P6SEL1 &= ~(BIT5 + BIT4);
 
-    if (!start_transfer(addr_size, addr)) {
-        return false;
-    }
-
-    for (uint16_t i = 0; i < byte_count; i++) {
-        UCB0TXBUF = bytes[i];
-        while (!(IFG2 & UCB0TXIFG)); /* Wait for byte to be sent */
-        success = !(UCB0STAT & UCNACKIFG);
-        if (!success) {
-            break;
-        }
-    }
-
-    stop_transfer();
-    return success;
-}
-
-bool i2c_write_addr8_data8(uint8_t addr, uint8_t value)
-{
-    return write_reg(ADDR_SIZE_8BIT, addr, REG_SIZE_8BIT, value);
-}
-
-bool i2c_write_addr8_data16(uint8_t addr, uint16_t value)
-{
-    return write_reg(ADDR_SIZE_8BIT, addr, REG_SIZE_16BIT, value);
-}
-
-bool i2c_write_addr16_data8(uint16_t addr, uint8_t value)
-{
-    return write_reg(ADDR_SIZE_16BIT, addr, REG_SIZE_8BIT, value);
-}
-
-bool i2c_write_addr16_data16(uint16_t addr, uint16_t value)
-{
-    return write_reg(ADDR_SIZE_16BIT, addr, REG_SIZE_16BIT, value);
-}
-bool i2c_write_addr8_bytes(uint8_t start_addr, uint8_t *bytes, uint16_t byte_count)
-{
-    return write_reg_bytes(ADDR_SIZE_8BIT, start_addr, bytes, byte_count);
+    USCI_REG(EUSCI_SEL,CTL1) |= UCSWRST; //eUSCI logic held in reset state (enable modifications)
+    USCI_REG(EUSCI_SEL,CTL0) = UCMST + UCSYNC + UCMODE_3;  //UCMST=1 sets Master mode, UCSYNC=1 sets Synchronous mode, UCMODE_3=1 sets I2C mode
+    USCI_REG(EUSCI_SEL,CTL1) |= UCSSEL_2; // sets clock source, UCSSEL_2 selects SMCLK
+    USCI_REG(EUSCI_SEL,BR0) = 10; //Bit Rate Control 1010
+    USCI_REG(EUSCI_SEL,BR1) = 0; //Bit Rate Control
+    USCI_REG(EUSCI_SEL,CTL1) &= ~UCSWRST;  //eUSCI reset released for operation
+    i2c_set_slave_address(DEFAULT_SLAVE_ADDRESS); // set default slave address
 }
 
 void i2c_set_slave_address(uint8_t addr)
 {
-    UCB0I2CSA = addr;
+    /*The I2CSAx bits contain the slave address of the external
+device to be addressed by the eUSCIx_B module. It is only used in master
+mode. The address is right justified. In 7-bit slave addressing mode, bit 6 is the
+MSB and bits 9-7 are ignored. In 10-bit slave addressing mode, bit 9 is the MSB.*/
+    USCI_REG(EUSCI_SEL,I2CSA) = addr; 
 }
 
-void i2c_init()
-{
-    /* Pinmux P1.6 (SCL) and P1.7 (SDA) to I2C peripheral  */
-    P1SEL |= BIT6 + BIT7;
-    P1SEL2 |= BIT6 + BIT7;
+/* --- READ FUNCTIONS --- */
 
-    UCB0CTL1 |= UCSWRST; /* Enable SW reset */
-    UCB0CTL0 = UCMST + UCSYNC + UCMODE_3; /* Single master, synchronous mode, I2C mode */
-    UCB0CTL1 |= UCSSEL_2; /* SMCLK */
-    UCB0BR0 = 10; /* SMCLK / 10 = ~100kHz */
-    UCB0BR1 = 0;
-    UCB0CTL1 &= ~UCSWRST; /* Clear SW */
-    i2c_set_slave_address(DEFAULT_SLAVE_ADDRESS);
+bool i2c_read_addr8_data8(uint8_t addr, uint8_t *data) {
+    return i2c_read_core(addr, 1, data, 1);
+}
+
+bool i2c_read_addr16_data8(uint16_t addr, uint8_t *data) {
+    return i2c_read_core(addr, 2, data, 1);
+}
+
+bool i2c_read_addr8_bytes(uint8_t start_addr, uint8_t *bytes, uint16_t byte_count) {
+    return i2c_read_core(start_addr, 1, bytes, byte_count);
+}
+
+bool i2c_read_addr8_data16(uint8_t addr, uint16_t *data) {
+    uint8_t buf[2];
+    if (!i2c_read_core(addr, 1, buf, 2)) return false;
+    *data = (buf[0] << 8) | buf[1]; /* Assemble MSB first safely */
+    return true;
+}
+
+bool i2c_read_addr16_data16(uint16_t addr, uint16_t *data) {
+    uint8_t buf[2];
+    if (!i2c_read_core(addr, 2, buf, 2)) return false;
+    *data = (buf[0] << 8) | buf[1];
+    return true;
+}
+
+bool i2c_read_addr8_data32(uint16_t addr, uint32_t *data) {
+    uint8_t buf[4];
+    if (!i2c_read_core(addr, 1, buf, 4)) return false;
+    *data = ((uint32_t)buf[0] << 24) | ((uint32_t)buf[1] << 16) | ((uint32_t)buf[2] << 8) | buf[3];
+    return true;
+}
+
+bool i2c_read_addr16_data32(uint16_t addr, uint32_t *data) {
+    uint8_t buf[4];
+    if (!i2c_read_core(addr, 2, buf, 4)) return false;
+    *data = ((uint32_t)buf[0] << 24) | ((uint32_t)buf[1] << 16) | ((uint32_t)buf[2] << 8) | buf[3];
+    return true;
+}
+
+/* --- WRITE FUNCTIONS --- */
+
+bool i2c_write_addr8_data8(uint8_t addr, uint8_t value) {
+    return i2c_write_core(addr, 1, &value, 1);
+}
+
+bool i2c_write_addr16_data8(uint16_t addr, uint8_t value) {
+    return i2c_write_core(addr, 2, &value, 1);
+}
+
+bool i2c_write_addr8_bytes(uint8_t start_addr, uint8_t *bytes, uint16_t byte_count) {
+    return i2c_write_core(start_addr, 1, bytes, byte_count);
+}
+
+bool i2c_write_addr8_data16(uint8_t addr, uint16_t value) {
+    uint8_t buf[2] = { (value >> 8) & 0xFF, value & 0xFF }; /* Disassemble to MSB first */
+    return i2c_write_core(addr, 1, buf, 2);
+}
+
+bool i2c_write_addr16_data16(uint16_t addr, uint16_t value) {
+    uint8_t buf[2] = { (value >> 8) & 0xFF, value & 0xFF };
+    return i2c_write_core(addr, 2, buf, 2);
 }
