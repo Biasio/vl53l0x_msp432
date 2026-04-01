@@ -53,6 +53,6 @@ bool vl53l0x_init();
  * @return True if success, False if error
  * @note   Polling-based
  */
-bool vl53l0x_read_range_single(vl53l0x_idx_t idx, uint16_t *range);
+bool vl53l0x_read_range_single(uint16_t *range);
 
 #endif /* VL53L0X_H */
