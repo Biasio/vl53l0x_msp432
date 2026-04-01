@@ -1,6 +1,4 @@
 #include "vl53l0x.h"
-#include "i2c.h"
-#include "gpio.h"
 
 #define REG_IDENTIFICATION_MODEL_ID (0xC0)
 #define REG_VHV_CONFIG_PAD_SCL_SDA_EXTSUP_HV (0x89)
@@ -48,30 +46,21 @@
  * offset to the aperture quadrant is (256 - 64 - 180) = 12 */
 #define SPAD_APERTURE_START_INDEX (12)
 
-typedef struct vl53l0x_info
-{
-    uint8_t addr;
-    gpio_t xshut_gpio;
-} vl53l0x_info_t;
-
-typedef enum
-{
-    CALIBRATION_TYPE_VHV,
-    CALIBRATION_TYPE_PHASE
-} calibration_type_t;
-
-static const vl53l0x_info_t vl53l0x_infos[] =
-{
-    [VL53L0X_IDX_FIRST] = { .addr = 0x30, .xshut_gpio = GPIO_XSHUT_FIRST },
-#ifdef VL53L0X_SECOND
-    [VL53L0X_IDX_SECOND] = { .addr = 0x31, .xshut_gpio = GPIO_XSHUT_SECOND },
-#endif
-#ifdef VL53L0X_THIRD
-    [VL53L0X_IDX_THIRD] = { .addr = 0x32, .xshut_gpio = GPIO_XSHUT_THIRD },
-#endif
-};
-
 static uint8_t stop_variable = 0;
+
+void gpio_init(void)
+{
+    /* P1.0 GPIO and output low */
+    PORT_REG(XSHUT_PORT, SEL) &= ~PIN_TO_BIT(XSHUT_PIN);
+    PORT_REG(XSHUT_PORT, DIR) |= PIN_TO_BIT(XSHUT_PIN);
+    PORT_REG(XSHUT_PORT, OUT) &= ~PIN_TO_BIT(XSHUT_PIN);
+}
+
+void gpio_toggle(bool state)
+{
+    if(!state) PORT_REG(XSHUT_PORT, OUT) |= PIN_TO_BIT(XSHUT_PIN);
+    else PORT_REG(XSHUT_PORT, OUT) &= ~PIN_TO_BIT(XSHUT_PIN);
+}
 
 /**
  * We can read the model id to confirm that the device is booted.
@@ -80,7 +69,7 @@ static uint8_t stop_variable = 0;
 static bool device_is_booted()
 {
     uint8_t device_id = 0;
-    if (!i2c_read_addr8_data8(REG_IDENTIFICATION_MODEL_ID, &device_id)) {
+    if (!i2c_read_core(REG_IDENTIFICATION_MODEL_ID, 1, &device_id, 1)) {
         return false;
     }
     return device_id == VL53L0X_EXPECTED_DEVICE_ID;
@@ -95,25 +84,25 @@ static bool data_init()
 
     /* Set 2v8 mode */
     uint8_t vhv_config_scl_sda = 0;
-    if (!i2c_read_addr8_data8(REG_VHV_CONFIG_PAD_SCL_SDA_EXTSUP_HV, &vhv_config_scl_sda)) {
+    if (!i2c_read_core(REG_VHV_CONFIG_PAD_SCL_SDA_EXTSUP_HV, 1, &vhv_config_scl_sda, 1)) {
         return false;
     }
     vhv_config_scl_sda |= 0x01;
-    if (!i2c_write_addr8_data8(REG_VHV_CONFIG_PAD_SCL_SDA_EXTSUP_HV, vhv_config_scl_sda)) {
+    if (!i2c_write_core(REG_VHV_CONFIG_PAD_SCL_SDA_EXTSUP_HV, 1, (uint8_t[]){vhv_config_scl_sda}, 1)) {
         return false;
     }
 
     /* Set I2C standard mode */
-    success = i2c_write_addr8_data8(0x88, 0x00);
+    success = i2c_write_core(0x88, 1, (uint8_t[]){0x00}, 1);
 
-    success &= i2c_write_addr8_data8(0x80, 0x01);
-    success &= i2c_write_addr8_data8(0xFF, 0x01);
-    success &= i2c_write_addr8_data8(0x00, 0x00);
+    success &= i2c_write_core(0x80, 1, (uint8_t[]){0x01}, 1);
+    success &= i2c_write_core(0xFF, 1, (uint8_t[]){0x01}, 1);
+    success &= i2c_write_core(0x00, 1, (uint8_t[]){0x00}, 1);
     /* It may be unnecessary to retrieve the stop variable for each sensor */
-    success &= i2c_read_addr8_data8(0x91, &stop_variable);
-    success &= i2c_write_addr8_data8(0x00, 0x01);
-    success &= i2c_write_addr8_data8(0xFF, 0x00);
-    success &= i2c_write_addr8_data8(0x80, 0x00);
+    success &= i2c_read_core(0x91, 1, &stop_variable, 1);
+    success &= i2c_write_core(0x00, 1, (uint8_t[]){0x01}, 1);
+    success &= i2c_write_core(0xFF, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x80, 1, (uint8_t[]){0x00}, 1);
 
     return success;
 }
@@ -126,16 +115,16 @@ static bool read_strobe()
 {
     bool success = false;
     uint8_t strobe = 0;
-    if (!i2c_write_addr8_data8(0x83, 0x00)) {
+    if (!i2c_write_core(0x83, 1, (uint8_t[]){0x00}, 1)) {
         return false;
     }
     do {
-        success = i2c_read_addr8_data8(0x83, &strobe);
+        success = i2c_read_core(0x83, 1, &strobe, 1);
     } while (success && (strobe == 0));
     if (!success) {
         return false;
     }
-    if (!i2c_write_addr8_data8(0x83, 0x01)) {
+    if (!i2c_write_core(0x83, 1, (uint8_t[]){0x01}, 1)) {
         return false;
     }
     return true;
@@ -159,83 +148,55 @@ static bool get_spad_info_from_nvm(uint8_t *spad_count, uint8_t *spad_type, uint
     bool success = false;
     uint8_t tmp_data8 = 0;
     uint32_t tmp_data32 = 0;
+    uint8_t buf[4] = {0};
 
     /* Setup to read from NVM */
-    success  = i2c_write_addr8_data8(0x80, 0x01);
-    success &= i2c_write_addr8_data8(0xFF, 0x01);
-    success &= i2c_write_addr8_data8(0x00, 0x00);
-    success &= i2c_write_addr8_data8(0xFF, 0x06);
-    success &= i2c_read_addr8_data8(0x83, &tmp_data8);
-    success &= i2c_write_addr8_data8(0x83, tmp_data8 | 0x04);
-    success &= i2c_write_addr8_data8(0xFF, 0x07);
-    success &= i2c_write_addr8_data8(0x81, 0x01);
-    success &= i2c_write_addr8_data8(0x80, 0x01);
+    success  = i2c_write_core(0x80, 1, (uint8_t[]){0x01}, 1);
+    success &= i2c_write_core(0xFF, 1, (uint8_t[]){0x01}, 1);
+    success &= i2c_write_core(0x00, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0xFF, 1, (uint8_t[]){0x06}, 1);
+    success &= i2c_read_core(0x83, 1, &tmp_data8, 1);
+    success &= i2c_write_core(0x83, 1, (uint8_t[]){tmp_data8 | 0x04}, 1);
+    success &= i2c_write_core(0xFF, 1, (uint8_t[]){0x07}, 1);
+    success &= i2c_write_core(0x81, 1, (uint8_t[]){0x01}, 1);
+    success &= i2c_write_core(0x80, 1, (uint8_t[]){0x01}, 1);
     if (!success) {
       return false;
     }
 
     /* Get the SPAD count and type */
-    success &= i2c_write_addr8_data8(0x94, 0x6b);
+    success &= i2c_write_core(0x94, 1, (uint8_t[]){0x6b}, 1);
     if (!success) {
         return false;
     }
     if (!read_strobe()) {
         return false;
     }
-    success &= i2c_read_addr8_data32(0x90, &tmp_data32);
+    
+    success &= i2c_read_core(0x90, 1, buf, 4);
     if (!success) {
         return false;
     }
+    tmp_data32 = ((uint32_t)buf[0] << 24) | ((uint32_t)buf[1] << 16) | ((uint32_t)buf[2] << 8) | buf[3];
+    
     *spad_count = (tmp_data32 >> 8) & 0x7f;
     *spad_type = (tmp_data32 >> 15) & 0x01;
 
-    /* Since the good SPAD map is already stored in REG_GLOBAL_CONFIG_SPAD_ENABLES_REF_0
-     * we can simply read that register instead of doing the below */
-#if 0
-    /* Get the first part of the SPAD map */
-    if (!i2c_write_addr8_data8(0x94, 0x24)) {
-        return false;
-    }
-    if (!read_strobe()) {
-        return false;
-    }
-    if (!i2c_read_addr8_data32(0x90, &tmp_data32)) {
-      return false;
-    }
-    good_spad_map[0] = (uint8_t)((tmp_data32 >> 24) & 0xFF);
-    good_spad_map[1] = (uint8_t)((tmp_data32 >> 16) & 0xFF);
-    good_spad_map[2] = (uint8_t)((tmp_data32 >> 8) & 0xFF);
-    good_spad_map[3] = (uint8_t)(tmp_data32 & 0xFF);
-
-    /* Get the second part of the SPAD map */
-    if (!i2c_write_addr8_data8(0x94, 0x25)) {
-        return false;
-    }
-    if (!read_strobe()) {
-        return false;
-    }
-    if (!i2c_read_addr8_data32(0x90, &tmp_data32)) {
-        return false;
-    }
-    good_spad_map[4] = (uint8_t)((tmp_data32 >> 24) & 0xFF);
-    good_spad_map[5] = (uint8_t)((tmp_data32 >> 16) & 0xFF);
-
-#endif
 
     /* Restore after reading from NVM */
-    success &=i2c_write_addr8_data8(0x81, 0x00);
-    success &=i2c_write_addr8_data8(0xFF, 0x06);
-    success &=i2c_read_addr8_data8(0x83, &tmp_data8);
-    success &=i2c_write_addr8_data8(0x83, tmp_data8 & 0xfb);
-    success &=i2c_write_addr8_data8(0xFF, 0x01);
-    success &=i2c_write_addr8_data8(0x00, 0x01);
-    success &=i2c_write_addr8_data8(0xFF, 0x00);
-    success &=i2c_write_addr8_data8(0x80, 0x00);
+    success &=i2c_write_core(0x81, 1, (uint8_t[]){0x00}, 1);
+    success &=i2c_write_core(0xFF, 1, (uint8_t[]){0x06}, 1);
+    success &=i2c_read_core(0x83, 1, &tmp_data8, 1);
+    success &=i2c_write_core(0x83, 1, (uint8_t[]){tmp_data8 & 0xfb}, 1);
+    success &=i2c_write_core(0xFF, 1, (uint8_t[]){0x01}, 1);
+    success &=i2c_write_core(0x00, 1, (uint8_t[]){0x01}, 1);
+    success &=i2c_write_core(0xFF, 1, (uint8_t[]){0x00}, 1);
+    success &=i2c_write_core(0x80, 1, (uint8_t[]){0x00}, 1);
 
     /* When we haven't configured the SPAD map yet, the SPAD map register actually
      * contains the good SPAD map, so we can retrieve it straight from this register
      * instead of reading it from the NVM. */
-    if (!i2c_read_addr8_bytes(REG_GLOBAL_CONFIG_SPAD_ENABLES_REF_0, good_spad_map, 6)) {
+    if (!i2c_read_core(REG_GLOBAL_CONFIG_SPAD_ENABLES_REF_0, 1, good_spad_map, 6)) {
         return false;
     }
     return success;
@@ -263,11 +224,11 @@ static bool set_spads_from_nvm()
         total_val += good_spad_map[i];
     }
 
-    bool success = i2c_write_addr8_data8(0xFF, 0x01);
-    success &= i2c_write_addr8_data8(REG_DYNAMIC_SPAD_REF_EN_START_OFFSET, 0x00);
-    success &= i2c_write_addr8_data8(REG_DYNAMIC_SPAD_NUM_REQUESTED_REF_SPAD, 0x2C);
-    success &= i2c_write_addr8_data8(0xFF, 0x00);
-    success &= i2c_write_addr8_data8(REG_GLOBAL_CONFIG_REF_EN_START_SELECT, SPAD_START_SELECT);
+    bool success = i2c_write_core(0xFF, 1, (uint8_t[]){0x01}, 1);
+    success &= i2c_write_core(REG_DYNAMIC_SPAD_REF_EN_START_OFFSET, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(REG_DYNAMIC_SPAD_NUM_REQUESTED_REF_SPAD, 1, (uint8_t[]){0x2C}, 1);
+    success &= i2c_write_core(0xFF, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(REG_GLOBAL_CONFIG_REF_EN_START_SELECT, 1, (uint8_t[]){SPAD_START_SELECT}, 1);
     if (!success) {
         return false;
     }
@@ -306,7 +267,7 @@ static bool set_spads_from_nvm()
     }
 
     /* Write the new SPAD configuration */
-    if (!i2c_write_addr8_bytes(REG_GLOBAL_CONFIG_SPAD_ENABLES_REF_0, spad_map, SPAD_MAP_ROW_COUNT)) {
+    if (!i2c_write_core(REG_GLOBAL_CONFIG_SPAD_ENABLES_REF_0, 1, spad_map, SPAD_MAP_ROW_COUNT)) {
         return false;
     }
 
@@ -318,107 +279,107 @@ static bool set_spads_from_nvm()
  */
 static bool load_default_tuning_settings()
 {
-    bool success = i2c_write_addr8_data8(0xFF, 0x01);
-    success &= i2c_write_addr8_data8(0x00, 0x00);
-    success &= i2c_write_addr8_data8(0xFF, 0x00);
-    success &= i2c_write_addr8_data8(0x09, 0x00);
-    success &= i2c_write_addr8_data8(0x10, 0x00);
-    success &= i2c_write_addr8_data8(0x11, 0x00);
-    success &= i2c_write_addr8_data8(0x24, 0x01);
-    success &= i2c_write_addr8_data8(0x25, 0xFF);
-    success &= i2c_write_addr8_data8(0x75, 0x00);
-    success &= i2c_write_addr8_data8(0xFF, 0x01);
-    success &= i2c_write_addr8_data8(0x4E, 0x2C);
-    success &= i2c_write_addr8_data8(0x48, 0x00);
-    success &= i2c_write_addr8_data8(0x30, 0x20);
-    success &= i2c_write_addr8_data8(0xFF, 0x00);
-    success &= i2c_write_addr8_data8(0x30, 0x09);
-    success &= i2c_write_addr8_data8(0x54, 0x00);
-    success &= i2c_write_addr8_data8(0x31, 0x04);
-    success &= i2c_write_addr8_data8(0x32, 0x03);
-    success &= i2c_write_addr8_data8(0x40, 0x83);
-    success &= i2c_write_addr8_data8(0x46, 0x25);
-    success &= i2c_write_addr8_data8(0x60, 0x00);
-    success &= i2c_write_addr8_data8(0x27, 0x00);
-    success &= i2c_write_addr8_data8(0x50, 0x06);
-    success &= i2c_write_addr8_data8(0x51, 0x00);
-    success &= i2c_write_addr8_data8(0x52, 0x96);
-    success &= i2c_write_addr8_data8(0x56, 0x08);
-    success &= i2c_write_addr8_data8(0x57, 0x30);
-    success &= i2c_write_addr8_data8(0x61, 0x00);
-    success &= i2c_write_addr8_data8(0x62, 0x00);
-    success &= i2c_write_addr8_data8(0x64, 0x00);
-    success &= i2c_write_addr8_data8(0x65, 0x00);
-    success &= i2c_write_addr8_data8(0x66, 0xA0);
-    success &= i2c_write_addr8_data8(0xFF, 0x01);
-    success &= i2c_write_addr8_data8(0x22, 0x32);
-    success &= i2c_write_addr8_data8(0x47, 0x14);
-    success &= i2c_write_addr8_data8(0x49, 0xFF);
-    success &= i2c_write_addr8_data8(0x4A, 0x00);
-    success &= i2c_write_addr8_data8(0xFF, 0x00);
-    success &= i2c_write_addr8_data8(0x7A, 0x0A);
-    success &= i2c_write_addr8_data8(0x7B, 0x00);
-    success &= i2c_write_addr8_data8(0x78, 0x21);
-    success &= i2c_write_addr8_data8(0xFF, 0x01);
-    success &= i2c_write_addr8_data8(0x23, 0x34);
-    success &= i2c_write_addr8_data8(0x42, 0x00);
-    success &= i2c_write_addr8_data8(0x44, 0xFF);
-    success &= i2c_write_addr8_data8(0x45, 0x26);
-    success &= i2c_write_addr8_data8(0x46, 0x05);
-    success &= i2c_write_addr8_data8(0x40, 0x40);
-    success &= i2c_write_addr8_data8(0x0E, 0x06);
-    success &= i2c_write_addr8_data8(0x20, 0x1A);
-    success &= i2c_write_addr8_data8(0x43, 0x40);
-    success &= i2c_write_addr8_data8(0xFF, 0x00);
-    success &= i2c_write_addr8_data8(0x34, 0x03);
-    success &= i2c_write_addr8_data8(0x35, 0x44);
-    success &= i2c_write_addr8_data8(0xFF, 0x01);
-    success &= i2c_write_addr8_data8(0x31, 0x04);
-    success &= i2c_write_addr8_data8(0x4B, 0x09);
-    success &= i2c_write_addr8_data8(0x4C, 0x05);
-    success &= i2c_write_addr8_data8(0x4D, 0x04);
-    success &= i2c_write_addr8_data8(0xFF, 0x00);
-    success &= i2c_write_addr8_data8(0x44, 0x00);
-    success &= i2c_write_addr8_data8(0x45, 0x20);
-    success &= i2c_write_addr8_data8(0x47, 0x08);
-    success &= i2c_write_addr8_data8(0x48, 0x28);
-    success &= i2c_write_addr8_data8(0x67, 0x00);
-    success &= i2c_write_addr8_data8(0x70, 0x04);
-    success &= i2c_write_addr8_data8(0x71, 0x01);
-    success &= i2c_write_addr8_data8(0x72, 0xFE);
-    success &= i2c_write_addr8_data8(0x76, 0x00);
-    success &= i2c_write_addr8_data8(0x77, 0x00);
-    success &= i2c_write_addr8_data8(0xFF, 0x01);
-    success &= i2c_write_addr8_data8(0x0D, 0x01);
-    success &= i2c_write_addr8_data8(0xFF, 0x00);
-    success &= i2c_write_addr8_data8(0x80, 0x01);
-    success &= i2c_write_addr8_data8(0x01, 0xF8);
-    success &= i2c_write_addr8_data8(0xFF, 0x01);
-    success &= i2c_write_addr8_data8(0x8E, 0x01);
-    success &= i2c_write_addr8_data8(0x00, 0x01);
-    success &= i2c_write_addr8_data8(0xFF, 0x00);
-    success &= i2c_write_addr8_data8(0x80, 0x00);
+    bool success = i2c_write_core(0xFF, 1, (uint8_t[]){0x01}, 1);
+    success &= i2c_write_core(0x00, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0xFF, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x09, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x10, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x11, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x24, 1, (uint8_t[]){0x01}, 1);
+    success &= i2c_write_core(0x25, 1, (uint8_t[]){0xFF}, 1);
+    success &= i2c_write_core(0x75, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0xFF, 1, (uint8_t[]){0x01}, 1);
+    success &= i2c_write_core(0x4E, 1, (uint8_t[]){0x2C}, 1);
+    success &= i2c_write_core(0x48, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x30, 1, (uint8_t[]){0x20}, 1);
+    success &= i2c_write_core(0xFF, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x30, 1, (uint8_t[]){0x09}, 1);
+    success &= i2c_write_core(0x54, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x31, 1, (uint8_t[]){0x04}, 1);
+    success &= i2c_write_core(0x32, 1, (uint8_t[]){0x03}, 1);
+    success &= i2c_write_core(0x40, 1, (uint8_t[]){0x83}, 1);
+    success &= i2c_write_core(0x46, 1, (uint8_t[]){0x25}, 1);
+    success &= i2c_write_core(0x60, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x27, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x50, 1, (uint8_t[]){0x06}, 1);
+    success &= i2c_write_core(0x51, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x52, 1, (uint8_t[]){0x96}, 1);
+    success &= i2c_write_core(0x56, 1, (uint8_t[]){0x08}, 1);
+    success &= i2c_write_core(0x57, 1, (uint8_t[]){0x30}, 1);
+    success &= i2c_write_core(0x61, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x62, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x64, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x65, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x66, 1, (uint8_t[]){0xA0}, 1);
+    success &= i2c_write_core(0xFF, 1, (uint8_t[]){0x01}, 1);
+    success &= i2c_write_core(0x22, 1, (uint8_t[]){0x32}, 1);
+    success &= i2c_write_core(0x47, 1, (uint8_t[]){0x14}, 1);
+    success &= i2c_write_core(0x49, 1, (uint8_t[]){0xFF}, 1);
+    success &= i2c_write_core(0x4A, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0xFF, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x7A, 1, (uint8_t[]){0x0A}, 1);
+    success &= i2c_write_core(0x7B, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x78, 1, (uint8_t[]){0x21}, 1);
+    success &= i2c_write_core(0xFF, 1, (uint8_t[]){0x01}, 1);
+    success &= i2c_write_core(0x23, 1, (uint8_t[]){0x34}, 1);
+    success &= i2c_write_core(0x42, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x44, 1, (uint8_t[]){0xFF}, 1);
+    success &= i2c_write_core(0x45, 1, (uint8_t[]){0x26}, 1);
+    success &= i2c_write_core(0x46, 1, (uint8_t[]){0x05}, 1);
+    success &= i2c_write_core(0x40, 1, (uint8_t[]){0x40}, 1);
+    success &= i2c_write_core(0x0E, 1, (uint8_t[]){0x06}, 1);
+    success &= i2c_write_core(0x20, 1, (uint8_t[]){0x1A}, 1);
+    success &= i2c_write_core(0x43, 1, (uint8_t[]){0x40}, 1);
+    success &= i2c_write_core(0xFF, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x34, 1, (uint8_t[]){0x03}, 1);
+    success &= i2c_write_core(0x35, 1, (uint8_t[]){0x44}, 1);
+    success &= i2c_write_core(0xFF, 1, (uint8_t[]){0x01}, 1);
+    success &= i2c_write_core(0x31, 1, (uint8_t[]){0x04}, 1);
+    success &= i2c_write_core(0x4B, 1, (uint8_t[]){0x09}, 1);
+    success &= i2c_write_core(0x4C, 1, (uint8_t[]){0x05}, 1);
+    success &= i2c_write_core(0x4D, 1, (uint8_t[]){0x04}, 1);
+    success &= i2c_write_core(0xFF, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x44, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x45, 1, (uint8_t[]){0x20}, 1);
+    success &= i2c_write_core(0x47, 1, (uint8_t[]){0x08}, 1);
+    success &= i2c_write_core(0x48, 1, (uint8_t[]){0x28}, 1);
+    success &= i2c_write_core(0x67, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x70, 1, (uint8_t[]){0x04}, 1);
+    success &= i2c_write_core(0x71, 1, (uint8_t[]){0x01}, 1);
+    success &= i2c_write_core(0x72, 1, (uint8_t[]){0xFE}, 1);
+    success &= i2c_write_core(0x76, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x77, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0xFF, 1, (uint8_t[]){0x01}, 1);
+    success &= i2c_write_core(0x0D, 1, (uint8_t[]){0x01}, 1);
+    success &= i2c_write_core(0xFF, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x80, 1, (uint8_t[]){0x01}, 1);
+    success &= i2c_write_core(0x01, 1, (uint8_t[]){0xF8}, 1);
+    success &= i2c_write_core(0xFF, 1, (uint8_t[]){0x01}, 1);
+    success &= i2c_write_core(0x8E, 1, (uint8_t[]){0x01}, 1);
+    success &= i2c_write_core(0x00, 1, (uint8_t[]){0x01}, 1);
+    success &= i2c_write_core(0xFF, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x80, 1, (uint8_t[]){0x00}, 1);
     return success;
 }
 
 static bool configure_interrupt()
 {
     /* Interrupt on new sample ready */
-    if (!i2c_write_addr8_data8(REG_SYSTEM_INTERRUPT_CONFIG_GPIO, 0x04)) {
+    if (!i2c_write_core(REG_SYSTEM_INTERRUPT_CONFIG_GPIO, 1, (uint8_t[]){0x04}, 1)) {
         return false;
     }
 
     /* Configure active low since the pin is pulled-up on most breakout boards */
     uint8_t gpio_hv_mux_active_high = 0;
-    if (!i2c_read_addr8_data8(REG_GPIO_HV_MUX_ACTIVE_HIGH, &gpio_hv_mux_active_high)) {
+    if (!i2c_read_core(REG_GPIO_HV_MUX_ACTIVE_HIGH, 1, &gpio_hv_mux_active_high, 1)) {
         return false;
     }
     gpio_hv_mux_active_high &= ~0x10;
-    if (!i2c_write_addr8_data8(REG_GPIO_HV_MUX_ACTIVE_HIGH, gpio_hv_mux_active_high)) {
+    if (!i2c_write_core(REG_GPIO_HV_MUX_ACTIVE_HIGH, 1, (uint8_t[]){gpio_hv_mux_active_high}, 1)) {
         return false;
     }
 
-    if (!i2c_write_addr8_data8(REG_SYSTEM_INTERRUPT_CLEAR, 0x01)) {
+    if (!i2c_write_core(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x01}, 1)) {
         return false;
     }
     return true;
@@ -430,7 +391,7 @@ static bool configure_interrupt()
  */
 static bool set_sequence_steps_enabled(uint8_t sequence_step)
 {
-    return i2c_write_addr8_data8(REG_SYSTEM_SEQUENCE_CONFIG, sequence_step);
+    return i2c_write_core(REG_SYSTEM_SEQUENCE_CONFIG, 1, (uint8_t[]){sequence_step}, 1);
 }
 
 /**
@@ -474,26 +435,26 @@ static bool perform_single_ref_calibration(calibration_type_t calib_type)
         sysrange_start = 0x01 | 0x00;
         break;
     }
-    if (!i2c_write_addr8_data8(REG_SYSTEM_SEQUENCE_CONFIG, sequence_config)) {
+    if (!i2c_write_core(REG_SYSTEM_SEQUENCE_CONFIG, 1, (uint8_t[]){sequence_config}, 1)) {
         return false;
     }
-    if (!i2c_write_addr8_data8(REG_SYSRANGE_START, sysrange_start)) {
+    if (!i2c_write_core(REG_SYSRANGE_START, 1, (uint8_t[]){sysrange_start}, 1)) {
         return false;
     }
     /* Wait for interrupt */
     uint8_t interrupt_status = 0;
     bool success = false;
     do {
-        success = i2c_read_addr8_data8(REG_RESULT_INTERRUPT_STATUS, &interrupt_status);
+        success = i2c_read_core(REG_RESULT_INTERRUPT_STATUS, 1, &interrupt_status, 1);
     } while (success && ((interrupt_status & 0x07) == 0));
     if (!success) {
         return false;
     }
-    if (!i2c_write_addr8_data8(REG_SYSTEM_INTERRUPT_CLEAR, 0x01)) {
+    if (!i2c_write_core(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x01}, 1)) {
         return false;
     }
 
-    if (!i2c_write_addr8_data8(REG_SYSRANGE_START, 0x00)) {
+    if (!i2c_write_core(REG_SYSRANGE_START, 1, (uint8_t[]){0x00}, 1)) {
         return false;
     }
     return true;
@@ -523,15 +484,15 @@ static bool perform_ref_calibration()
 static bool configure_address(uint8_t addr)
 {
     /* 7-bit address */
-    return i2c_write_addr8_data8(REG_SLAVE_DEVICE_ADDRESS, addr & 0x7F);
+    return i2c_write_core(REG_SLAVE_DEVICE_ADDRESS, 1, (uint8_t[]){addr & 0x7F}, 1);
 }
 
 /**
  * Sets the sensor in hardware standby by flipping the XSHUT pin.
  */
-static void set_hardware_standby(vl53l0x_idx_t idx, bool enable)
+void set_hardware_standby(vl53l0x_idx_t idx, bool enable)
 {
-    gpio_set_output(vl53l0x_infos[idx].xshut_gpio, !enable);
+    // gpio_set_output(vl53l0x_infos[idx].xshut_gpio, !enable);
 }
 
 /**
@@ -541,12 +502,9 @@ static void set_hardware_standby(vl53l0x_idx_t idx, bool enable)
  *
  * NOTE: The pins are hard-coded to P1.0, P1.1, and P1.2.
  **/
-static void configure_gpio()
+void configure_gpio()
 {
     gpio_init();
-    gpio_set_output(GPIO_XSHUT_FIRST, false);
-    gpio_set_output(GPIO_XSHUT_SECOND, false);
-    gpio_set_output(GPIO_XSHUT_THIRD, false);
 }
 
 /* Sets the address of a single VL53L0X sensor.
@@ -559,48 +517,18 @@ static bool init_address(vl53l0x_idx_t idx)
 
     /* The datasheet doesn't say how long we must wait to leave hw standby,
      * but using the same delay as vl6180x seems to work fine. */
-    __delay_cycles(400);
+    for(volatile uint32_t j = 0; j < 400; j++); 
 
     if (!device_is_booted()) {
         return false;
     }
 
-    if (!configure_address(vl53l0x_infos[idx].addr)) {
-        return false;
-    }
     return true;
 }
 
-/**
- * Initializes the sensors by putting them in hw standby and then
- * waking them up one-by-one as described in AN4846.
- */
-static bool init_addresses()
+static bool init_config()
 {
-    /* Puts all sensors in hardware standby */
-    configure_gpio();
-
-    /* Wake each sensor up one by one and set a unique address for each one */
-    if (!init_address(VL53L0X_IDX_FIRST)) {
-        return false;
-    }
-#ifdef VL53L0X_SECOND
-    if (!init_address(VL53L0X_IDX_SECOND)) {
-        return false;
-    }
-#endif
-#ifdef VL53L0X_THIRD
-    if (!init_address(VL53L0X_IDX_THIRD)) {
-        return false;
-    }
-#endif
-
-    return true;
-}
-
-static bool init_config(vl53l0x_idx_t idx)
-{
-    i2c_set_slave_address(vl53l0x_infos[idx].addr);
+    i2c_set_slave_address(VL53L0X_DEFAULT_ADDRESS);
     if (!data_init()) {
         return false;
     }
@@ -615,46 +543,36 @@ static bool init_config(vl53l0x_idx_t idx)
 
 bool vl53l0x_init()
 {
-    if (!init_addresses()) {
+    if (!init_address(VL53L0X_IDX_FIRST)) {
         return false;
     }
-    if (!init_config(VL53L0X_IDX_FIRST)) {
+    if (!init_config()) {
         return false;
     }
-#ifdef VL53L0X_SECOND
-    if (!init_config(VL53L0X_IDX_SECOND)) {
-        return false;
-    }
-#endif
-#ifdef VL53L0X_THIRD
-    if (!init_config(VL53L0X_IDX_THIRD)) {
-        return false;
-    }
-#endif
     return true;
 }
 
-bool vl53l0x_read_range_single(vl53l0x_idx_t idx, uint16_t *range)
+bool vl53l0x_read_range_single(uint16_t *range)
 {
-    i2c_set_slave_address(vl53l0x_infos[idx].addr);
-    bool success = i2c_write_addr8_data8(0x80, 0x01);
-    success &= i2c_write_addr8_data8(0xFF, 0x01);
-    success &= i2c_write_addr8_data8(0x00, 0x00);
-    success &= i2c_write_addr8_data8(0x91, stop_variable);
-    success &= i2c_write_addr8_data8(0x00, 0x01);
-    success &= i2c_write_addr8_data8(0xFF, 0x00);
-    success &= i2c_write_addr8_data8(0x80, 0x00);
+    i2c_set_slave_address(VL53L0X_DEFAULT_ADDRESS);
+    bool success = i2c_write_core(0x80, 1, (uint8_t[]){0x01}, 1);
+    success &= i2c_write_core(0xFF, 1, (uint8_t[]){0x01}, 1);
+    success &= i2c_write_core(0x00, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x91, 1, (uint8_t[]){stop_variable}, 1);
+    success &= i2c_write_core(0x00, 1, (uint8_t[]){0x01}, 1);
+    success &= i2c_write_core(0xFF, 1, (uint8_t[]){0x00}, 1);
+    success &= i2c_write_core(0x80, 1, (uint8_t[]){0x00}, 1);
     if (!success) {
         return false;
     }
 
-    if (!i2c_write_addr8_data8(REG_SYSRANGE_START, 0x01)) {
+    if (!i2c_write_core(REG_SYSRANGE_START, 1, (uint8_t[]){0x01}, 1)) {
         return false;
     }
 
     uint8_t sysrange_start = 0;
     do {
-        success = i2c_read_addr8_data8(REG_SYSRANGE_START, &sysrange_start);
+        success = i2c_read_core(REG_SYSRANGE_START, 1, &sysrange_start, 1);
     } while (success && (sysrange_start & 0x01));
     if (!success) {
         return false;
@@ -662,17 +580,19 @@ bool vl53l0x_read_range_single(vl53l0x_idx_t idx, uint16_t *range)
 
     uint8_t interrupt_status = 0;
     do {
-        success = i2c_read_addr8_data8(REG_RESULT_INTERRUPT_STATUS, &interrupt_status);
+        success = i2c_read_core(REG_RESULT_INTERRUPT_STATUS, 1, &interrupt_status, 1);
     } while (success && ((interrupt_status & 0x07) == 0));
     if (!success) {
         return false;
     }
 
-    if (!i2c_read_addr8_data16(REG_RESULT_RANGE_STATUS + 10, range)) {
+    uint8_t range_buf[2];
+    if (!i2c_read_core(REG_RESULT_RANGE_STATUS + 10, 1, range_buf, 2)) {
         return false;
     }
+    *range = ((uint16_t)range_buf[0] << 8) | range_buf[1];
 
-    if (!i2c_write_addr8_data8(REG_SYSTEM_INTERRUPT_CLEAR, 0x01)) {
+    if (!i2c_write_core(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x01}, 1)) {
         return false;
     }
 
