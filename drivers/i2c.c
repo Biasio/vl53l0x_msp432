@@ -9,7 +9,7 @@ static bool start_transfer(uint16_t addr, uint8_t addr_len)
 
     /* Send MSB first if 16-bit address */
     if (addr_len == 2) {
-        UCB1TXBUF = (addr >> 8) & 0xFF; //MSB
+        USCI_REG(EUSCI_SEL,TXBUF) = (addr >> 8) & 0xFF; //MSB
         while (USCI_REG(EUSCI_SEL,CTL1) & UCTXSTT); /* Wait for start condition to be sent */
         /*If the slave does not acknowledge the transmitted data, the not-acknowledge interrupt flag UCNACKIFG is set*/
         if (USCI_REG(EUSCI_SEL,STAT) & UCNACKIFG) return false;
@@ -19,7 +19,7 @@ static bool start_transfer(uint16_t addr, uint8_t addr_len)
     }
 
     /* Send LSB (or 8-bit address) */
-    UCB1TXBUF = addr & 0xFF;
+    USCI_REG(EUSCI_SEL,TXBUF) = addr & 0xFF;
     if (addr_len == 1) {
         while (USCI_REG(EUSCI_SEL,CTL1) & UCTXSTT);
     }
@@ -61,7 +61,7 @@ bool i2c_write_core(const uint16_t addr, uint8_t addr_len, const uint8_t *data, 
     if (!start_transfer(addr, addr_len)) return false; // start the transfer for adressing a slave's register
     
     for (uint16_t i = 0; i < data_len; ++i){
-        UCB1TXBUF = data[i]; /* write a byte in the buffer */
+        USCI_REG(EUSCI_SEL,TXBUF) = data[i]; /* write a byte in the buffer */
         /* CTXIFG2 is set when UCBxTXBUF is empty
         in slave mode, if the slave address defined in UCBxI2COA2 was on the bus in
         the same frame. */
@@ -80,8 +80,8 @@ bool i2c_write_core(const uint16_t addr, uint8_t addr_len, const uint8_t *data, 
 void i2c_init()
 {
     // Primary function selection -> I2C
-    P6SEL0 |= BIT5 + BIT4;
-    P6SEL1 &= ~(BIT5 + BIT4);
+    P6->SEL0 |= BIT5 + BIT4;
+    P6->SEL1 &= ~(BIT5 + BIT4);
 
     USCI_REG(EUSCI_SEL,CTL1) |= UCSWRST; //eUSCI logic held in reset state (enable modifications)
     USCI_REG(EUSCI_SEL,CTL0) = UCMST + UCSYNC + UCMODE_3;  //UCMST=1 sets Master mode, UCSYNC=1 sets Synchronous mode, UCMODE_3=1 sets I2C mode
