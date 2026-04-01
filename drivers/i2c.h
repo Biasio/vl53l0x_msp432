@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include "macro.h"
 
 #define DEFAULT_SLAVE_ADDRESS (0x29)
 
@@ -14,8 +15,6 @@
 #define I2C_SCL_PIN 5
 #define I2C_SDA_PORT 6
 #define I2C_SDA_PIN 4
-
-#define BIT_PIN(pin) (BIT## pin)
 
 /* Removed the invalid USCI_REG_VAR, GLUE2_VAR, and USCI_REG_PTR macros */
 
