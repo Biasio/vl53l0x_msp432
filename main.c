@@ -22,7 +22,7 @@ int main(void)
     bool success = vl53l0x_init();
     uint16_t range =0;
     while (success) {
-        success = vl53l0x_read_range_single(VL53L0X_IDX_FIRST, &range);
+        success = vl53l0x_read_range_single(&range);
         printf("%" PRIu16 "\n",  range);
         for(volatile uint32_t j = 0; j < 100000; j++);
     }
