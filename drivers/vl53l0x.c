@@ -51,15 +51,15 @@ static uint8_t stop_variable = 0;
 void xshut_init(void)
 {
     /* P1.0 GPIO and output low */
-    PORT_REG(XSHUT_PORT, SEL) &= ~PIN_TO_BIT(XSHUT_PIN);
-    PORT_REG(XSHUT_PORT, DIR) |= PIN_TO_BIT(XSHUT_PIN);
-    PORT_REG(XSHUT_PORT, OUT) &= ~PIN_TO_BIT(XSHUT_PIN);
+    PORT_REG(XSHUT_PORT)->SEL &= ~PIN_TO_BIT(XSHUT_PIN);
+    PORT_REG(XSHUT_PORT)->DIR |= PIN_TO_BIT(XSHUT_PIN);
+    PORT_REG(XSHUT_PORT)->OUT &= ~PIN_TO_BIT(XSHUT_PIN);
 }
 
 void xshut_toggle(bool state)
 {
-    if(!state) PORT_REG(XSHUT_PORT, OUT) |= PIN_TO_BIT(XSHUT_PIN);
-    else PORT_REG(XSHUT_PORT, OUT) &= ~PIN_TO_BIT(XSHUT_PIN);
+    if(!state) PORT_REG(XSHUT_PORT)->OUT |= PIN_TO_BIT(XSHUT_PIN);
+    else PORT_REG(XSHUT_PORT)->OUT &= ~PIN_TO_BIT(XSHUT_PIN);
 }
 
 /**
