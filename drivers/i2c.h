@@ -1,9 +1,6 @@
 #ifndef I2C_H
 #define I2C_H
 
-#ifndef __MSP432P401R__
-    #define __MSP432P401R__
-#endif
 #include "msp432.h"
 #include <stdint.h>
 #include <stdbool.h>

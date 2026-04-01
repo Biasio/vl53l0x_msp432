@@ -1,6 +1,3 @@
-#ifndef __MSP432P401R__
-    #define __MSP432P401R__
-#endif
 #include <msp432.h>
 #include "drivers/i2c.h"
 #include "drivers/vl53l0x.h"

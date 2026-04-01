@@ -1,10 +1,6 @@
 #ifndef VL53L0X_H
 #define VL53L0X_H
 
-#ifndef __MSP432P401R__
-    #define __MSP432P401R__
-#endif
-
 #include <stdbool.h>
 #include <stdint.h>
 #include <msp432.h>
