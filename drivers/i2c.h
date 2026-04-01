@@ -12,7 +12,7 @@
 #define USCI_REG_VAR(usci,reg)     GLUE2_VAR(usci, reg) 
 #define GLUE2_VAR(a, b)       a ## b
 
-#define USCI_REG_PTR(usci,reg)     ((usci)->(reg))
+#define USCI_REG_PTR(usci,reg)     ((usci)->reg)
 
 void i2c_init(void);
 
