@@ -17,7 +17,7 @@
 
 // Glue macros (no expansion of the macros passed as arguments)
 #define GLUE2(a, b)       a ## b
-#define GLUE3(a, b, c)    a ## b ## c
+#define GLUE3(a, b, c)    a ## b -> c
 
 #define VL53L0X_OUT_OF_RANGE (8190)
 
