@@ -535,7 +535,7 @@ static bool init_config()
 
 bool vl53l0x_init()
 {
-    if (!init_address(VL53L0X_IDX_FIRST)) {
+    if (!init_address()) {
         return false;
     }
     if (!init_config()) {

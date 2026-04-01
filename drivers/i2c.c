@@ -1,7 +1,5 @@
 #include "i2c.h"
 
-
-
 static bool start_transfer(uint16_t addr, uint8_t addr_len)
 {
     USCI_REG_PTR(EUSCI_SEL,CTL1) |= UCTXSTT + UCTR; /* Set up master as TX and send start condition */
