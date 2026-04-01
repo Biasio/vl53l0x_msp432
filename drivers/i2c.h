@@ -9,8 +9,10 @@
 #define DEFAULT_SLAVE_ADDRESS (0x29)
 #define EUSCI_SEL UCB1
 
-#define USCI_REG(usci,reg)     GLUE2(usci, reg) 
-#define GLUE2(a, b)       a ## b
+#define USCI_REG_VAR(usci,reg)     GLUE2_VAR(usci, reg) 
+#define GLUE2_VAR(a, b)       a ## b
+
+#define USCI_REG_PTR(usci,reg)     ((usci)->(reg))
 
 void i2c_init(void);
 
