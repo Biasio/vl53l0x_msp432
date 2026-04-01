@@ -48,7 +48,7 @@
 
 static uint8_t stop_variable = 0;
 
-void gpio_init(void)
+void xshut_init(void)
 {
     /* P1.0 GPIO and output low */
     PORT_REG(XSHUT_PORT, SEL) &= ~PIN_TO_BIT(XSHUT_PIN);
@@ -56,7 +56,7 @@ void gpio_init(void)
     PORT_REG(XSHUT_PORT, OUT) &= ~PIN_TO_BIT(XSHUT_PIN);
 }
 
-void gpio_toggle(bool state)
+void xshut_toggle(bool state)
 {
     if(!state) PORT_REG(XSHUT_PORT, OUT) |= PIN_TO_BIT(XSHUT_PIN);
     else PORT_REG(XSHUT_PORT, OUT) &= ~PIN_TO_BIT(XSHUT_PIN);
@@ -488,14 +488,6 @@ static bool configure_address(uint8_t addr)
 }
 
 /**
- * Sets the sensor in hardware standby by flipping the XSHUT pin.
- */
-void set_hardware_standby(vl53l0x_idx_t idx, bool enable)
-{
-    // gpio_set_output(vl53l0x_infos[idx].xshut_gpio, !enable);
-}
-
-/**
  * Configures the GPIOs used for the XSHUT pin.
  * Output low by default means the sensors will be in
  * hardware standby after this function is called.
@@ -504,15 +496,15 @@ void set_hardware_standby(vl53l0x_idx_t idx, bool enable)
  **/
 void configure_gpio()
 {
-    gpio_init();
+    xshut_init();
 }
 
 /* Sets the address of a single VL53L0X sensor.
  * This functions assumes that all non-configured VL53L0X are still
  * in hardware standby. */
-static bool init_address(vl53l0x_idx_t idx)
+static bool init_address()
 {
-    set_hardware_standby(idx, false);
+    xshut_toggle(enable);
     i2c_set_slave_address(VL53L0X_DEFAULT_ADDRESS);
 
     /* The datasheet doesn't say how long we must wait to leave hw standby,

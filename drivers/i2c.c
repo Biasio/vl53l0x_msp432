@@ -1,6 +1,5 @@
 #include "i2c.h"
-#include <msp432.h>
-#include <stddef.h>
+
 
 
 static bool start_transfer(uint16_t addr, uint8_t addr_len)
@@ -65,7 +64,7 @@ bool i2c_write_core(const uint16_t addr, uint8_t addr_len, const uint8_t *data, 
         /* CTXIFG2 is set when UCBxTXBUF is empty
         in slave mode, if the slave address defined in UCBxI2COA2 was on the bus in
         the same frame. */
-        while (!(IFG2 & UCTXIFG)); 
+        while (!(IFG2 & USCI_REG(EUSCI_SEL,RXIFG))); 
         /*If the slave does not acknowledge the transmitted data, the not-acknowledge interrupt flag UCNACKIFG is set*/
         if (USCI_REG(EUSCI_SEL,STAT) & UCNACKIFG) {
             stop_transfer();

@@ -4,6 +4,7 @@
 #include "msp432.h"
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 #define DEFAULT_SLAVE_ADDRESS (0x29)
 #define EUSCI_SEL UCB1

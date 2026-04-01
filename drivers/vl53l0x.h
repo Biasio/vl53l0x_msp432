@@ -26,8 +26,8 @@
  * @note Each sensor must have its XSHUT pin connected.
  */
 
-void gpio_init(void);
-void gpio_toggle(bool state);
+void xshut_init(void);
+void xshut_toggle(bool state);
 
 bool vl53l0x_init();
 /**
