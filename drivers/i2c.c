@@ -77,10 +77,10 @@ bool i2c_write_core(const uint16_t addr, uint8_t addr_len, const uint8_t *data, 
 void i2c_init()
 {
     // Primary function selection -> I2C
-    I2C_SDA_PORT->SEL0 |= PIN_TO_BIT(I2C_SDA_PIN);
-    I2C_SCL_PORT->SEL0 |= PIN_TO_BIT(I2C_SCL_PIN);
-    I2C_SDA_PORT->SEL1 &= ~PIN_TO_BIT(I2C_SDA_PIN);
-    I2C_SCL_PORT->SEL1 &= ~PIN_TO_BIT(I2C_SCL_PIN);
+    PORT_REG(I2C_SDA_PORT)->SEL0 |= PIN_TO_BIT(I2C_SDA_PIN);
+    PORT_REG(I2C_SCL_PORT)->SEL0 |= PIN_TO_BIT(I2C_SCL_PIN);
+    PORT_REG(I2C_SDA_PORT)->SEL1 &= ~PIN_TO_BIT(I2C_SDA_PIN);
+    PORT_REG(I2C_SCL_PORT)->SEL1 &= ~PIN_TO_BIT(I2C_SCL_PIN);
 
     EUSCI_SEL->CTLW0 |= UCSWRST; //eUSCI logic held in reset state (enable modifications)
     
