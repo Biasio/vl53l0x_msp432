@@ -46,12 +46,19 @@
  * offset to the aperture quadrant is (256 - 64 - 180) = 12 */
 #define SPAD_APERTURE_START_INDEX (12)
 
+
+typedef enum {
+    CALIBRATION_TYPE_VHV,
+    CALIBRATION_TYPE_PHASE
+} calibration_type_t;
+
 static uint8_t stop_variable = 0;
 
 void xshut_init(void)
 {
     /* P1.0 GPIO and output low */
-    PORT_REG(XSHUT_PORT)->SEL &= ~PIN_TO_BIT(XSHUT_PIN);
+    PORT_REG(XSHUT_PORT)->SEL0 &= ~PIN_TO_BIT(XSHUT_PIN);
+    PORT_REG(XSHUT_PORT)->SEL1 &= ~PIN_TO_BIT(XSHUT_PIN);
     PORT_REG(XSHUT_PORT)->DIR |= PIN_TO_BIT(XSHUT_PIN);
     PORT_REG(XSHUT_PORT)->OUT &= ~PIN_TO_BIT(XSHUT_PIN);
 }
@@ -504,7 +511,7 @@ void configure_gpio()
  * in hardware standby. */
 static bool init_address()
 {
-    xshut_toggle(enable);
+    xshut_toggle(false);
     i2c_set_slave_address(VL53L0X_DEFAULT_ADDRESS);
 
     /* The datasheet doesn't say how long we must wait to leave hw standby,
