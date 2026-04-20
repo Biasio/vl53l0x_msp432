@@ -12,7 +12,6 @@
 #define XSHUT_PIN 1
 
 
-
 #define VL53L0X_OUT_OF_RANGE (8190)
 
 /**
