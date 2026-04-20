@@ -33,4 +33,5 @@ bool i2c_write_core(const uint16_t addr, uint8_t addr_len, const uint8_t *data, 
 /* Note: Removed the duplicate i2c_init and i2c_set_slave_address declarations 
    from the end of this file to resolve the "#174-D linkage conflict" error */
 
+   
 #endif /* I2C_H */
