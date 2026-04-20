@@ -65,7 +65,7 @@ void xshut_init(void)
 
 void xshut_toggle(bool state)
 {
-    if(!state) PORT_REG(XSHUT_PORT)->OUT |= PIN_TO_BIT(XSHUT_PIN);
+    if(state) PORT_REG(XSHUT_PORT)->OUT |= PIN_TO_BIT(XSHUT_PIN);
     else PORT_REG(XSHUT_PORT)->OUT &= ~PIN_TO_BIT(XSHUT_PIN);
 }
 
@@ -511,7 +511,7 @@ void configure_gpio()
  * in hardware standby. */
 static bool init_address()
 {
-    xshut_toggle(false);
+    xshut_toggle(true);
     i2c_set_slave_address(VL53L0X_DEFAULT_ADDRESS);
 
     /* The datasheet doesn't say how long we must wait to leave hw standby,
