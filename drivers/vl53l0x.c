@@ -613,17 +613,17 @@ static bool static_init()
 
 static bool perform_single_ref_calibration(calibration_type_t calib_type)
 {
-    uint8_t REG_SYSRANGE_START = 0;
+    uint8_t sysrange_start = 0;
     uint8_t sequence_config = 0;
     switch (calib_type)
     {
     case CALIBRATION_TYPE_VHV:
         sequence_config = 0x01;
-        REG_SYSRANGE_START = 0x01 | 0x40;
+        sysrange_start = 0x01 | 0x40;
         break;
     case CALIBRATION_TYPE_PHASE:
         sequence_config = 0x02;
-        REG_SYSRANGE_START = 0x01 | 0x00;
+        sysrange_start = 0x01 | 0x00;
         break;
     }
     if (!i2c_write(
@@ -632,8 +632,8 @@ static bool perform_single_ref_calibration(calibration_type_t calib_type)
         return false;
     }
     if (!i2c_write(
-            REG_REG_SYSRANGE_START, 1, 
-            (uint8_t[]){REG_SYSRANGE_START}, 1)) {
+            REG_SYSRANGE_START, 1, 
+            (uint8_t[]){sysrange_start}, 1)) {
         return false;
     }
     /* Wait for interrupt */
@@ -654,7 +654,7 @@ static bool perform_single_ref_calibration(calibration_type_t calib_type)
     }
 
     if (!i2c_write(
-            REG_REG_SYSRANGE_START, 1, 
+            REG_SYSRANGE_START, 1, 
             (uint8_t[]){0x00}, 1)) {
         return false;
     }
