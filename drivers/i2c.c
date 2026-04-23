@@ -34,7 +34,7 @@ static void stop_transfer()
     while (EUSCI_SEL->CTLW0 & UCTXSTP); // wait for the end of the communication
 }
 
-bool i2c_read_core(const uint16_t addr, uint8_t addr_len, uint8_t *data, uint16_t data_len)
+bool i2c_read(const uint16_t addr, uint8_t addr_len, uint8_t *data, uint8_t data_len)
 {
     if (!start_transfer(addr, addr_len)) return false; // start the transfer to request data
 
@@ -53,7 +53,7 @@ bool i2c_read_core(const uint16_t addr, uint8_t addr_len, uint8_t *data, uint16_
 }
 
 
-bool i2c_write_core(const uint16_t addr, uint8_t addr_len, const uint8_t *data, uint16_t data_len)
+bool i2c_write(const uint16_t addr, uint8_t addr_len, const uint8_t *data, uint8_t data_len)
 {
     if (!start_transfer(addr, addr_len)) return false; // start the transfer for adressing a slave's register
     
@@ -77,10 +77,10 @@ bool i2c_write_core(const uint16_t addr, uint8_t addr_len, const uint8_t *data, 
 void i2c_init()
 {
     // Primary function selection -> I2C
-    PORT_REG(I2C_SDA_PORT)->SEL0 |= PIN_TO_BIT(I2C_SDA_PIN);
-    PORT_REG(I2C_SCL_PORT)->SEL0 |= PIN_TO_BIT(I2C_SCL_PIN);
-    PORT_REG(I2C_SDA_PORT)->SEL1 &= ~PIN_TO_BIT(I2C_SDA_PIN);
-    PORT_REG(I2C_SCL_PORT)->SEL1 &= ~PIN_TO_BIT(I2C_SCL_PIN);
+    PORT(I2C_SDA_PORT)->SEL0 |= ONE_HOT_BIT(I2C_SDA_PIN);
+    PORT(I2C_SCL_PORT)->SEL0 |= ONE_HOT_BIT(I2C_SCL_PIN);
+    PORT(I2C_SDA_PORT)->SEL1 &= ~ONE_HOT_BIT(I2C_SDA_PIN);
+    PORT(I2C_SCL_PORT)->SEL1 &= ~ONE_HOT_BIT(I2C_SCL_PIN);
 
     EUSCI_SEL->CTLW0 |= UCSWRST; //eUSCI logic held in reset state (enable modifications)
     

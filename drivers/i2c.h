@@ -20,10 +20,9 @@ void i2c_init(void);
 
 void i2c_set_slave_address(uint8_t addr);
 
-bool i2c_read_core(const uint16_t addr, uint8_t addr_len, uint8_t *data, uint16_t data_len);
+bool i2c_read(const uint16_t addr, uint8_t addr_len, uint8_t *data, uint8_t data_len);
 
-bool i2c_write_core(const uint16_t addr, uint8_t addr_len, const uint8_t *data, uint16_t data_len);
-
+bool i2c_write(const uint16_t addr, uint8_t addr_len, const uint8_t *data, uint8_t data_len);
 
 
 #endif /* I2C_H */

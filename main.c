@@ -5,11 +5,11 @@
 #include <inttypes.h>
 
 
-
 static void msp432_init()
 {
     WDT_A->CTL = WDT_A_CTL_PW | WDT_A_CTL_HOLD;
 }
+
 
 int main(void)
 {
