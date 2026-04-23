@@ -40,33 +40,33 @@ static bool data_init()
 
     /* Set I2C standard mode */
     success = i2c_write(
-        I2C_MODE, 1, 
+        REG_I2C_MODE, 1, 
         (uint8_t[]){0x00}, 1);
 
     success &= i2c_write(
-        POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
+        REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
         (uint8_t[]){0x01}, 1);
 
     success &= i2c_write(
-        INTERNAL_TUNING_2, 1, 
+        REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x01}, 1);
     
     success &= i2c_write(
-        SYSRANGE_START, 1, 
+        REG_SYSRANGE_START, 1, 
         (uint8_t[]){0x00}, 1);
     /* It may be unnecessary to retrieve the stop variable for each sensor */
     success &= i2c_read(
-        INTERNAL_TUNING_1, 1, 
+        REG_INTERNAL_TUNING_1, 1, 
         &stop_variable, 1);
 
     success &= i2c_write(
-        SYSRANGE_START, 1, 
+        REG_SYSRANGE_START, 1, 
         (uint8_t[]){0x01}, 1);
     success &= i2c_write(
-        INTERNAL_TUNING_2, 1, 
+        REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x00}, 1);
     success &= i2c_write(
-        POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
+        REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
         (uint8_t[]){0x00}, 1);
 
     return success;
@@ -125,16 +125,16 @@ static bool get_spad_info_from_nvm(uint8_t *spad_count, uint8_t *spad_type, uint
 
     /* Setup to read from NVM */
     success  = i2c_write(
-        POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
+        REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
         (uint8_t[]){0x01}, 1);
     success &= i2c_write(
-        INTERNAL_TUNING_2, 1, 
+        REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x01}, 1);
     success &= i2c_write(
-        SYSRANGE_START, 1, 
+        REG_SYSRANGE_START, 1, 
         (uint8_t[]){0x00}, 1);
     success &= i2c_write(
-        INTERNAL_TUNING_2, 1, 
+        REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x06}, 1);
     success &= i2c_read(
         REG_NVM_READ_STROBE, 1, 
@@ -143,13 +143,13 @@ static bool get_spad_info_from_nvm(uint8_t *spad_count, uint8_t *spad_type, uint
         REG_NVM_READ_STROBE, 1, 
         (uint8_t[]){tmp_data8 | 0x04}, 1);
     success &= i2c_write(
-        INTERNAL_TUNING_2, 1, 
+        REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x07}, 1);
     success &= i2c_write(
-        SYSTEM_HISTOGRAM_BIN 1, 
+        REG_SYSTEM_HISTOGRAM_BIN 1, 
         (uint8_t[]){0x01}, 1);
     success &= i2c_write(
-        POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
+        REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
         (uint8_t[]){0x01}, 1);
     if (!success) return false;
 
@@ -176,10 +176,10 @@ static bool get_spad_info_from_nvm(uint8_t *spad_count, uint8_t *spad_type, uint
 
     /* Restore after reading from NVM */
     success &=i2c_write(
-        SYSTEM_HISTOGRAM_BIN 1, 
+        REG_SYSTEM_HISTOGRAM_BIN 1, 
         (uint8_t[]){0x00}, 1);
     success &=i2c_write(
-        INTERNAL_TUNING_2, 1, 
+        REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x06}, 1);
     success &=i2c_read(
         REG_NVM_READ_STROBE, 1, 
@@ -188,16 +188,16 @@ static bool get_spad_info_from_nvm(uint8_t *spad_count, uint8_t *spad_type, uint
         REG_NVM_READ_STROBE, 1, 
         (uint8_t[]){tmp_data8 & 0xfb}, 1);
     success &=i2c_write(
-        INTERNAL_TUNING_2, 1, 
+        REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x01}, 1);
     success &=i2c_write(
-        SYSRANGE_START, 1, 
+        REG_SYSRANGE_START, 1, 
         (uint8_t[]){0x01}, 1);
     success &=i2c_write(
-        INTERNAL_TUNING_2, 1, 
+        REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x00}, 1);
     success &=i2c_write(
-        POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
+        REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
         (uint8_t[]){0x00}, 1);
 
     /* When we haven't configured the SPAD map yet, the SPAD map register actually
@@ -234,7 +234,7 @@ static bool set_spads_from_nvm()
     }
 
     bool success = i2c_write(
-        INTERNAL_TUNING_2, 1, 
+        REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x01}, 1);
     success &= i2c_write(
         REG_DYNAMIC_SPAD_REF_EN_START_OFFSET, 1, 
@@ -243,7 +243,7 @@ static bool set_spads_from_nvm()
         REG_DYNAMIC_SPAD_NUM_REQUESTED_REF_SPAD, 1, 
         (uint8_t[]){0x2C}, 1);
     success &= i2c_write(
-        INTERNAL_TUNING_2, 1, 
+        REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x00}, 1);
     success &= i2c_write(
         REG_GLOBAL_CONFIG_REF_EN_START_SELECT, 1, 
@@ -301,13 +301,13 @@ static bool set_spads_from_nvm()
 static bool load_default_tuning_settings()
 {
     bool success = i2c_write(
-        INTERNAL_TUNING_2, 1, 
+        REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x01}, 1);
     success &= i2c_write(
-        SYSRANGE_START, 1, 
+        REG_SYSRANGE_START, 1, 
         (uint8_t[]){0x00}, 1);
     success &= i2c_write(
-        INTERNAL_TUNING_2, 1, 
+        REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x00}, 1);
     success &= i2c_write(
         REG_SYSTEM_RANGE_CONFIG, 1, 
@@ -328,7 +328,7 @@ static bool load_default_tuning_settings()
         REG_OSC_CALIBRATE_VAL, 1, 
         (uint8_t[]){0x00}, 1);
     success &= i2c_write(
-        INTERNAL_TUNING_2, 1, 
+        REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x01}, 1);
     success &= i2c_write(
         REG_DYNAMIC_SPAD_NUM_REQUESTED_REF_SPAD, 1, 
@@ -340,7 +340,7 @@ static bool load_default_tuning_settings()
         REG_ALGO_PHASECAL_CONFIG_TIMEOUT, 1, 
         (uint8_t[]){0x20}, 1);
     success &= i2c_write(
-        INTERNAL_TUNING_2, 1, 
+        REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x00}, 1);
     success &= i2c_write(
         REG_ALGO_PHASECAL_CONFIG_TIMEOUT, 1, 
@@ -397,7 +397,7 @@ static bool load_default_tuning_settings()
         REG_UNKNOWN_0x66, 1, 
         (uint8_t[]){0xA0}, 1);
     success &= i2c_write(
-        INTERNAL_TUNING_2, 1, 
+        REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x01}, 1);
     success &= i2c_write(
         REG_VHV_CONFIG_TIMEOUT_MACROP, 1, 
@@ -412,7 +412,7 @@ static bool load_default_tuning_settings()
         REG_UNKNOWN_0x4A, 1, 
         (uint8_t[]){0x00}, 1);
     success &= i2c_write(
-        INTERNAL_TUNING_2, 1, 
+        REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x00}, 1);
     success &= i2c_write(
         REG_RESULT_CORE_AMBIENT_WINDOW_EVENTS_RTN, 1, 
@@ -424,7 +424,7 @@ static bool load_default_tuning_settings()
         REG_RESULT_PEAK_SIGNAL_RATE_REF, 1, 
         (uint8_t[]){0x21}, 1);
     success &= i2c_write(
-        INTERNAL_TUNING_2, 1, 
+        REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x01}, 1);
     success &= i2c_write(
         REG_VHV_CONFIG_LOOPBOUND, 1, 
@@ -454,7 +454,7 @@ static bool load_default_tuning_settings()
         REG_UNKNOWN_0x43, 1, 
         (uint8_t[]){0x40}, 1);
     success &= i2c_write(
-        INTERNAL_TUNING_2, 1, 
+        REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x00}, 1);
     success &= i2c_write(
         REG_ALGO_PHASECAL_CONFIG_START, 1, 
@@ -463,7 +463,7 @@ static bool load_default_tuning_settings()
         REG_ALGO_PHASECAL_CONFIG_END, 1, 
         (uint8_t[]){0x44}, 1);
     success &= i2c_write(
-        INTERNAL_TUNING_2, 1, 
+        REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x01}, 1);
     success &= i2c_write(
         REG_ALGO_PHASECAL_CONFIG, 1, 
@@ -478,7 +478,7 @@ static bool load_default_tuning_settings()
         REG_UNKNOWN_0x4D, 1, 
         (uint8_t[]){0x04}, 1);
     success &= i2c_write(
-        INTERNAL_TUNING_2, 1, 
+        REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x00}, 1);
     success &= i2c_write(
         REG_FINAL_RANGE_CONFIG_MIN_COUNT_RATE_RTN_LIMIT, 1, 
@@ -511,34 +511,34 @@ static bool load_default_tuning_settings()
         REG_RESULT_CORE_RANGING_TOTAL_EVENTS_REF, 1, 
         (uint8_t[]){0x00}, 1);
     success &= i2c_write(
-        INTERNAL_TUNING_2, 1, 
+        REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x01}, 1);
     success &= i2c_write(
         0x0D, 1, 
         (uint8_t[]){0x01}, 1);
     success &= i2c_write(
-        INTERNAL_TUNING_2, 1, 
+        REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x00}, 1);
     success &= i2c_write(
-        POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
+        REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
         (uint8_t[]){0x01}, 1);
     success &= i2c_write(
         REG_SYSTEM_SEQUENCE_CONFIG, 1, 
         (uint8_t[]){0xF8}, 1);
     success &= i2c_write(
-        INTERNAL_TUNING_2, 1, 
+        REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x01}, 1);
     success &= i2c_write(
         REG_INTERNAL_TUNING_PAGE_REG, 1, 
         (uint8_t[]){0x01}, 1);
     success &= i2c_write(
-        SYSRANGE_START, 1, 
+        REG_SYSRANGE_START, 1, 
         (uint8_t[]){0x01}, 1);
     success &= i2c_write(
-        INTERNAL_TUNING_2, 1, 
+        REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x00}, 1);
     success &= i2c_write(
-        POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
+        REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
         (uint8_t[]){0x00}, 1);
     return success;
 }
@@ -613,17 +613,17 @@ static bool static_init()
 
 static bool perform_single_ref_calibration(calibration_type_t calib_type)
 {
-    uint8_t sysrange_start = 0;
+    uint8_t REG_SYSRANGE_START = 0;
     uint8_t sequence_config = 0;
     switch (calib_type)
     {
     case CALIBRATION_TYPE_VHV:
         sequence_config = 0x01;
-        sysrange_start = 0x01 | 0x40;
+        REG_SYSRANGE_START = 0x01 | 0x40;
         break;
     case CALIBRATION_TYPE_PHASE:
         sequence_config = 0x02;
-        sysrange_start = 0x01 | 0x00;
+        REG_SYSRANGE_START = 0x01 | 0x00;
         break;
     }
     if (!i2c_write(
@@ -632,8 +632,8 @@ static bool perform_single_ref_calibration(calibration_type_t calib_type)
         return false;
     }
     if (!i2c_write(
-            REG_SYSRANGE_START, 1, 
-            (uint8_t[]){sysrange_start}, 1)) {
+            REG_REG_SYSRANGE_START, 1, 
+            (uint8_t[]){REG_SYSRANGE_START}, 1)) {
         return false;
     }
     /* Wait for interrupt */
@@ -654,7 +654,7 @@ static bool perform_single_ref_calibration(calibration_type_t calib_type)
     }
 
     if (!i2c_write(
-            REG_SYSRANGE_START, 1, 
+            REG_REG_SYSRANGE_START, 1, 
             (uint8_t[]){0x00}, 1)) {
         return false;
     }
@@ -752,42 +752,42 @@ bool vl53l0x_read_range_single(uint16_t *range)
 {
     i2c_set_slave_address(VL53L0X_DEFAULT_ADDRESS);
     bool success = i2c_write(
-        POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
+        REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
         (uint8_t[]){0x01}, 1);
     success &= i2c_write(
-        INTERNAL_TUNING_2, 1, 
+        REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x01}, 1);
     success &= i2c_write(
-        SYSRANGE_START, 1, 
+        REG_SYSRANGE_START, 1, 
         (uint8_t[]){0x00}, 1);
     success &= i2c_write(
-        INTERNAL_TUNING_1, 1, 
+        REG_INTERNAL_TUNING_1, 1, 
         (uint8_t[]){stop_variable}, 1);
     success &= i2c_write(
-        SYSRANGE_START, 1, 
+        REG_SYSRANGE_START, 1, 
         (uint8_t[]){0x01}, 1);
     success &= i2c_write(
-        INTERNAL_TUNING_2, 1, 
+        REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x00}, 1);
     success &= i2c_write(
-        POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
+        REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
         (uint8_t[]){0x00}, 1);
     if (!success) {
         return false;
     }
 
     if (!i2c_write(
-            REG_SYSRANGE_START, 1, 
+            REG_REG_SYSRANGE_START, 1, 
             (uint8_t[]){0x01}, 1)) {
         return false;
     }
 
-    uint8_t sysrange_start = 0;
+    uint8_t REG_SYSRANGE_START = 0;
     do {
         success = i2c_read(
-            REG_SYSRANGE_START, 1, 
-            &sysrange_start, 1);
-    } while (success && (sysrange_start & 0x01));
+            REG_REG_SYSRANGE_START, 1, 
+            &REG_SYSRANGE_START, 1);
+    } while (success && (REG_SYSRANGE_START & 0x01));
     if (!success) {
         return false;
     }
