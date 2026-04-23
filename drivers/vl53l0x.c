@@ -146,7 +146,7 @@ static bool get_spad_info_from_nvm(uint8_t *spad_count, uint8_t *spad_type, uint
         REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x07}, 1);
     success &= i2c_write(
-        REG_SYSTEM_HISTOGRAM_BIN 1, 
+        REG_SYSTEM_HISTOGRAM_BIN, 1, 
         (uint8_t[]){0x01}, 1);
     success &= i2c_write(
         REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
@@ -176,7 +176,7 @@ static bool get_spad_info_from_nvm(uint8_t *spad_count, uint8_t *spad_type, uint
 
     /* Restore after reading from NVM */
     success &=i2c_write(
-        REG_SYSTEM_HISTOGRAM_BIN 1, 
+        REG_SYSTEM_HISTOGRAM_BIN, 1, 
         (uint8_t[]){0x00}, 1);
     success &=i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
@@ -682,14 +682,6 @@ static bool perform_ref_calibration()
     return true;
 }
 
-static bool configure_address(uint8_t addr)
-{
-    /* 7-bit address */
-    return i2c_write(
-        REG_SLAVE_DEVICE_ADDRESS, 1, 
-        (uint8_t[]){addr & 0x7F}, 1);
-}
-
 
 /* Sets the address of the VL53L0X sensor */
 static bool init_address()
@@ -777,17 +769,17 @@ bool vl53l0x_read_range_single(uint16_t *range)
     }
 
     if (!i2c_write(
-            REG_REG_SYSRANGE_START, 1, 
+            REG_SYSRANGE_START, 1, 
             (uint8_t[]){0x01}, 1)) {
         return false;
     }
 
-    uint8_t REG_SYSRANGE_START = 0;
+    uint8_t sysrange_start = 0;
     do {
         success = i2c_read(
-            REG_REG_SYSRANGE_START, 1, 
-            &REG_SYSRANGE_START, 1);
-    } while (success && (REG_SYSRANGE_START & 0x01));
+            REG_SYSRANGE_START, 1, 
+            &sysrange_start, 1);
+    } while (success && (sysrange_start & 0x01));
     if (!success) {
         return false;
     }
