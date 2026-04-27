@@ -25,6 +25,32 @@
 
 /* END OF USER CONFIG */
 
+ /* GPIO and output low */
+void xshut_gpio_init(void);
+
+/* Helper function for setting XSHOUT->OUT register 
+High (state=true) or 
+Low (state=false) */
+void xshut_toggle(bool state);
+
+/*  */
+bool vl53l0x_init();
+
+bool vl53l0x_read_range_single(uint16_t *range);
+
+// Configures the threshold interrupt and then starts the sensor in continuous ranging mode. In this mode the VL53L0X takes measurements autonomously and asserts its INTERRUPT pin whenever a result crosses the threshold.
+bool vl53l0x_start_continuous(void);
+
+// Halts the ranging engine and leaves the sensor idle. You must call
+// this before switching back to single-shot mode, or before putting
+// the sensor itself into hardware standby via XSHUT.
+bool vl53l0x_stop_continuous(void);
+
+// Reads the range result from the sensor and then clears the sensor's
+// internal interrupt latch, which physically releases the INTERRUPT pin
+bool vl53l0x_read_range_interrupt(uint16_t *range);
+
+
 
 
 #define VL53L0X_OUT_OF_RANGE (8190)
@@ -56,31 +82,6 @@ typedef enum {
     CALIBRATION_TYPE_PHASE
 } calibration_type_t;
 
-
- /* GPIO and output low */
-void xshut_gpio_init(void);
-
-/* Helper function for setting XSHOUT->OUT register 
-High (state=true) or 
-Low (state=false) */
-void xshut_toggle(bool state);
-
-/*  */
-bool vl53l0x_init();
-
-bool vl53l0x_read_range_single(uint16_t *range);
-
-// Configures the threshold interrupt and then starts the sensor in continuous ranging mode. In this mode the VL53L0X takes measurements autonomously and asserts its INTERRUPT pin whenever a result crosses the threshold.
-bool vl53l0x_start_continuous(void);
-
-// Halts the ranging engine and leaves the sensor idle. You must call
-// this before switching back to single-shot mode, or before putting
-// the sensor itself into hardware standby via XSHUT.
-bool vl53l0x_stop_continuous(void);
-
-// Reads the range result from the sensor and then clears the sensor's
-// internal interrupt latch, which physically releases the INTERRUPT pin
-bool vl53l0x_read_range_interrupt(uint16_t *range);
 
 
 /**************** VL53L0X REGISTER ADDRESSES ****************/
