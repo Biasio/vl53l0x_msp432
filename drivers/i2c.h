@@ -1,7 +1,7 @@
 #ifndef I2C_H
 #define I2C_H
 
-#include "msp432.h"
+#include <ti/devices/msp432p4xx/inc/msp.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>

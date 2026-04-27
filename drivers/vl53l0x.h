@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <msp432.h>
+#include <ti/devices/msp432p4xx/inc/msp.h>
 #include "i2c.h"
 #include "macro.h"
 #include "config.h"
