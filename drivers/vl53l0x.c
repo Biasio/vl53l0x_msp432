@@ -707,9 +707,8 @@ static bool init_address()
     xshut_toggle(true);
     i2c_set_slave_address(VL53L0X_DEFAULT_ADDRESS);
 
-    /* The datasheet doesn't say how long we must wait to leave hw standby,
-     * but using the same delay as vl6180x seems to work fine. */
-    for(volatile uint32_t j = 0; j < 400; j++); 
+    /* Wait for approx 2ms (assuming a 48MHz clock, 3 to 5 cycles per iteration)*/
+    for(volatile uint32_t j = 0; j < 9600; j++);
 
     if (!device_is_booted()) return false;
 
@@ -756,7 +755,6 @@ bool vl53l0x_init()
     if (!init_config()) return false;
     return true;
 }
-
 
 bool vl53l0x_read_range_single(uint16_t *range)
 {
@@ -812,10 +810,22 @@ bool vl53l0x_read_range_single(uint16_t *range)
         return false;
     }
 
+    uint8_t range_status = 0;
+    if (!i2c_read(REG_RESULT_RANGE_STATUS, 1, &range_status, 1)) {
+        // clear interrupt before returning
+        i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x01}, 1);
+        return false;
+    }
+    if (range_status & 0x07) {
+        i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x01}, 1);
+        return false;
+    }
+
     uint8_t range_buf[2];
     if (!i2c_read(
             REG_RESULT_RANGE_STATUS + 10, 1, 
             range_buf, 2)) {
+        i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x01}, 1);
         return false;
     }
     *range = ((uint16_t)range_buf[0] << 8) | range_buf[1];
@@ -893,36 +903,32 @@ bool vl53l0x_start_continuous(void)
     if (!configure_LowThresh_interrupt()) {
         return false;
     }
+    // Ensure the sensor is idle
+    if (!i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x01}, 1)) {
+        return false;
+    }
+    // Wait for stop to complete
+    uint8_t val=0x00;
+    do {
+        if (!i2c_read(REG_SYSRANGE_START, 1, &val, 1)) return false;
+    } while (val & 0x01);
 
-    // Required preamble to re-arm the ranging engine
-    bool status = i2c_write(REG_SYSTEM_SEQUENCE_CONFIG, 1, 
-                    (uint8_t[]){RANGE_SEQUENCE_STEP_FINAL_RANGE}, 1);
-
-    status &= i2c_write(REG_INTERNAL_TUNING_2, 1, (uint8_t[]){0x01}, 1);
-    status &= i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x00}, 1);
-    status &= i2c_write(REG_INTERNAL_TUNING_1, 1, (uint8_t[]){stop_variable}, 1);
-    status &= i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x01}, 1);
-    status &= i2c_write(REG_INTERNAL_TUNING_2, 1, (uint8_t[]){0x00}, 1);
-    status &= i2c_write(REG_SYSTEM_SEQUENCE_CONFIG, 1, 
-                    (uint8_t[]){0x00}, 1);
-    if (!status) return false;
-
-    // bit1=1 selects continuous mode.
-    return i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x03}, 1);
+    // Start continuous ranging
+    return i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x02}, 1);
 }
 
 
 bool vl53l0x_stop_continuous(void)
 {
-    // Writing 0x01 to SYSRANGE_START stops the continuous cycle
     bool status = i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x01}, 1);
 
-    // Required stop sequence
+    status &= i2c_write(REG_POWER_MANAGEMENT_GO1_POWER_FORCE, 1, (uint8_t[]){0x01}, 1);
     status &= i2c_write(REG_INTERNAL_TUNING_2, 1, (uint8_t[]){0x01}, 1);
     status &= i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x00}, 1);
     status &= i2c_write(REG_INTERNAL_TUNING_1, 1, (uint8_t[]){0x00}, 1);
     status &= i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x01}, 1);
     status &= i2c_write(REG_INTERNAL_TUNING_2, 1, (uint8_t[]){0x00}, 1);
+    status &= i2c_write(REG_POWER_MANAGEMENT_GO1_POWER_FORCE, 1, (uint8_t[]){0x00}, 1);
 
     return status;
 }
@@ -932,15 +938,12 @@ bool vl53l0x_stop_continuous(void)
 bool vl53l0x_read_range_interrupt(uint16_t *range)
 {
     // Read the status byte and validate before trusting the range result.
-    uint8_t status_byte = 0;
-    if (!i2c_read(REG_RESULT_RANGE_STATUS, 1, &status_byte, 1)) {
-        i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x01}, 1);
+    uint8_t status_byte;
+    if (!i2c_read(REG_RESULT_RANGE_STATUS, 1, &status_byte, 1))
         return false;
-    }
 
-    uint8_t error_code = (status_byte >> 3) & 0x1F;
-    if (error_code != 0x0B) {
-        // Invalid measurement — clear interrupt and report failure
+    // Check lower 3 bits
+    if (status_byte & 0x07) {
         i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x01}, 1);
         return false;
     }
