@@ -599,7 +599,7 @@ static bool static_init()
         return false;
     }
 
-    if (!configure_interrupt()) {
+    if (!configure_interrupt(0x00)) {
         return false;
     }
 
@@ -821,8 +821,7 @@ bool vl53l0x_read_range_single(uint16_t *range)
 // Sets the VL53L0X GPIO interrupt to fire in "level low" mode, meaning the INT pin asserts whenever the measured distance fall out of the threshold window.
 static bool configure_LowThresh_interrupt(void)
 {
-    if (!i2c_write_core(REG_SYSTEM_INTERRUPT_CONFIG_GPIO, 1,
-                        (uint8_t[]){0x01}, 1)) {
+    if (!configure_interrupt(0x01)) {
         return false;
     }
 
@@ -874,7 +873,7 @@ static bool configure_LowThresh_interrupt(void)
 bool vl53l0x_start_continuous(void)
 {
     // Configure the threshold-based interrupt before starting ranging
-    if (!configure_threshold_interrupt()) {
+    if (!configure_LowThresh_interrupt()) {
         return false;
     }
 
