@@ -25,7 +25,10 @@
 
 /* END OF USER CONFIG */
 
- /* GPIO and output low */
+/*
+This function initializes the microcontroller pin connected to the sensor's XSHUT pin. It configures the pin as an output and pulls it low to ensure the sensor starts in hardware standby.
+*/
+void xshut_gpio_init(void);
 
 
 /* Helper function for setting XSHOUT->OUT register 

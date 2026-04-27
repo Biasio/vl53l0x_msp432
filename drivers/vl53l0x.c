@@ -716,10 +716,8 @@ static bool init_config()
 }
 
 
-/*
-This function initializes the microcontroller pin connected to the sensor's XSHUT pin. It configures the pin as an output and pulls it low to ensure the sensor starts in hardware standby.
-*/
-static void xshut_gpio_init(void)
+
+void xshut_gpio_init(void)
 {
     PORT(XSHUT_PORT)->SEL0 &= ~ONE_HOT_BIT(XSHUT_PIN);
     PORT(XSHUT_PORT)->SEL1 &= ~ONE_HOT_BIT(XSHUT_PIN);
