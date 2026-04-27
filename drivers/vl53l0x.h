@@ -6,7 +6,7 @@
 #include <msp432.h>
 #include "i2c.h"
 #include "macro.h"
-
+#include "config.h"
 
 
 /* START OF USER CONFIG */
