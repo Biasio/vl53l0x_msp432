@@ -913,7 +913,7 @@ bool vl53l0x_read_range_interrupt(uint16_t *range)
 {
     // Read the status byte and validate before trusting the range result.
     uint8_t status_byte = 0;
-    i2c_read(REG_RESULT_RANGE_STATUS, 1, &status_byte, 1)
+    i2c_read(REG_RESULT_RANGE_STATUS, 1, &status_byte, 1);
 
     uint8_t error_code = (status_byte >> 3) & 0x1F;
     if (error_code != 0x0B) {
@@ -940,3 +940,4 @@ bool vl53l0x_read_range_interrupt(uint16_t *range)
     return i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1,
                           (uint8_t[]){0x01}, 1);
 }
+
