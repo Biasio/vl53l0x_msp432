@@ -22,7 +22,8 @@ static bool data_init()
 {
     bool success = false;
 
-    /* Set 2v8 mode */
+    /* Set 3V3 mode */
+    // first read the register to keep the other register's bits intact
     uint8_t vhv_config_scl_sda = 0;
     if (!i2c_read(
             REG_VHV_CONFIG_PAD_SCL_SDA_EXTSUP_HV, 1, 
@@ -543,12 +544,12 @@ static bool load_default_tuning_settings()
     return success;
 }
 
-static bool configure_interrupt()
+static bool configure_interrupt(uint8_t mode)
 {
     /* Interrupt on new sample ready */
     if (!i2c_write(
             REG_SYSTEM_INTERRUPT_CONFIG_GPIO, 1, 
-            (uint8_t[]){0x04}, 1)) {
+            (uint8_t[]){mode}, 1)) {
         return false;
     }
 
@@ -724,6 +725,7 @@ void xshut_gpio_init(void)
     PORT(XSHUT_PORT)->OUT &= ~ONE_HOT_BIT(XSHUT_PIN);
 }
 
+
 void xshut_toggle(bool state)
 {
     if(state) PORT(XSHUT_PORT)->OUT |= ONE_HOT_BIT(XSHUT_PIN);
@@ -735,7 +737,6 @@ bool vl53l0x_init()
 {
     if (!init_address()) return false;
     if (!init_config()) return false;
-    
     return true;
 }
 
@@ -814,4 +815,129 @@ bool vl53l0x_read_range_single(uint16_t *range)
     }
 
     return true;
+}
+
+
+// Sets the VL53L0X GPIO interrupt to fire in "level low" mode, meaning the INT pin asserts whenever the measured distance fall out of the threshold window.
+static bool configure_LowThresh_interrupt(void)
+{
+    if (!i2c_write_core(REG_SYSTEM_INTERRUPT_CONFIG_GPIO, 1,
+                        (uint8_t[]){0x01}, 1)) {
+        return false;
+    }
+
+    //Write the low threshold. The register is 16-bit big-endian
+    uint8_t low_thresh_bytes[2] = {
+        (uint8_t)(VL53L0X_LOW_THRESH >> 8),    // MSB
+        (uint8_t)(VL53L0X_LOW_THRESH & 0xFF)   // LSB
+    };
+    if (!i2c_write_core(REG_SYSTEM_THRESH_LOW, 1, low_thresh_bytes, 2)) {
+        return false;
+    }
+
+    // Write the high threshold
+    uint8_t high_thresh_bytes[2] = {
+        (uint8_t)(VL53L0X_HIGH_THRESH >> 8),
+        (uint8_t)(VL53L0X_HIGH_THRESH & 0xFF)
+    };
+    if (!i2c_write_core(REG_SYSTEM_THRESH_HIGH, 1, high_thresh_bytes, 2)) {
+        return false;
+    }
+
+    //Configure the INT pin polarity to active LOW.
+    uint8_t gpio_hv = 0;
+    if (!i2c_read_core(REG_GPIO_HV_MUX_ACTIVE_HIGH, 1, &gpio_hv, 1)) {
+        return false;
+    }
+    #if VL53L0X_INT_POLARITY == 0
+        gpio_hv &= ~(0x10);
+    #else
+        gpio_hv |= (0x10);
+    #endif
+    
+    if (!i2c_write_core(REG_GPIO_HV_MUX_ACTIVE_HIGH, 1,
+                        (uint8_t[]){gpio_hv}, 1)) {
+        return false;
+    }
+
+    // Clear any interrupt that may already be pending on the sensor.
+    if (!i2c_write_core(REG_SYSTEM_INTERRUPT_CLEAR, 1,
+                        (uint8_t[]){0x01}, 1)) {
+        return false;
+    }
+
+    return true;
+}
+
+
+
+bool vl53l0x_start_continuous(void)
+{
+    // Configure the threshold-based interrupt before starting ranging
+    if (!configure_threshold_interrupt()) {
+        return false;
+    }
+
+    // Required preamble to re-arm the ranging engine
+    bool status = i2c_write_core(RANGE_SEQUENCE_STEP_FINAL_RANGE, 1, (uint8_t[]){0x01}, 1);
+    status &= i2c_write_core(REG_INTERNAL_TUNING_2, 1, (uint8_t[]){0x01}, 1);
+    status &= i2c_write_core(REG_SYSRANGE_START, 1, (uint8_t[]){0x00}, 1);
+    status &= i2c_write_core(REG_INTERNAL_TUNING_1, 1, (uint8_t[]){stop_variable}, 1);
+    status &= i2c_write_core(REG_SYSRANGE_START, 1, (uint8_t[]){0x01}, 1);
+    status &= i2c_write_core(REG_INTERNAL_TUNING_2, 1, (uint8_t[]){0x00}, 1);
+    status &= i2c_write_core(RANGE_SEQUENCE_STEP_FINAL_RANGE, 1, (uint8_t[]){0x00}, 1);
+    if (!status) return false;
+
+    // bit1=1 selects continuous mode.
+    return i2c_write_core(REG_SYSRANGE_START, 1, (uint8_t[]){0x03}, 1);
+}
+
+
+bool vl53l0x_stop_continuous(void)
+{
+    // Writing 0x01 to SYSRANGE_START stops the continuous cycle
+    bool status = i2c_write_core(REG_SYSRANGE_START, 1, (uint8_t[]){0x01}, 1);
+
+    // Required stop sequence
+    status &= i2c_write_core(REG_INTERNAL_TUNING_2, 1, (uint8_t[]){0x01}, 1);
+    status &= i2c_write_core(REG_SYSRANGE_START, 1, (uint8_t[]){0x00}, 1);
+    status &= i2c_write_core(REG_INTERNAL_TUNING_1, 1, (uint8_t[]){0x00}, 1);
+    status &= i2c_write_core(REG_SYSRANGE_START, 1, (uint8_t[]){0x01}, 1);
+    status &= i2c_write_core(REG_INTERNAL_TUNING_2, 1, (uint8_t[]){0x00}, 1);
+
+    return status;
+}
+
+
+
+bool vl53l0x_read_range_interrupt(uint16_t *range)
+{
+    // Read the status byte and validate before trusting the range result.
+    uint8_t status_byte = 0;
+    i2c_read_core(REG_RESULT_RANGE_STATUS, 1, &status_byte, 1)
+
+    uint8_t error_code = (status_byte >> 3) & 0x1F;
+    if (error_code != 0x0B) {
+        // Invalid measurement or previous read failed — clear interrupt and report failure
+        i2c_write_core(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x01}, 1);
+        return false;
+    }
+
+    // Measurement is valid. Read the 2-byte range result.
+    uint8_t buf[2] = {0, 0};
+    if (!i2c_read_core(REG_RESULT_RANGE_STATUS + 0x0A, 1, buf, 2)) {
+        i2c_write_core(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x01}, 1);
+        return false;
+    }
+    
+    *range = ((uint16_t)buf[0] << 8) | buf[1];
+
+    // Normalize out-of-range sentinel values (8190/8191 means "no target")
+    if (*range >= 8190) {
+        *range = VL53L0X_OUT_OF_RANGE;
+    }
+
+    // Clear the interrupt last, after all reads are complete.
+    return i2c_write_core(REG_SYSTEM_INTERRUPT_CLEAR, 1,
+                          (uint8_t[]){0x01}, 1);
 }

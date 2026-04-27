@@ -7,14 +7,29 @@
 #include "i2c.h"
 #include "macro.h"
 
-// Config for the sensor pin mapping
-#define XSHUT_PORT 1
-#define XSHUT_PIN 1
+
+
+/* START OF USER CONFIG */
+    #ifndef VL53L0X_LOW_THRESH
+    #define VL53L0X_LOW_THRESH (600U)
+    #endif
+    #ifndef VL53L0X_HIGH_THRESH
+    #define VL53L0X_HIGH_THRESH (0xFFFFU)
+    #endif
+
+
+    #ifndef VL53L0X_INT_POLARITY
+    /* 0 = ACTIVE_LOW, 1 = ACTIVE_HIGH */
+    #define VL53L0X_INT_POLARITY 0  
+    #endif
+
+/* END OF USER CONFIG */
+
+
 
 #define VL53L0X_OUT_OF_RANGE (8190)
-
 #define VL53L0X_EXPECTED_DEVICE_ID (0xEE)
-#define VL53L0X_DEFAULT_ADDRESS (0x29)
+#define VL53L0X_DEFAULT_ADDRESS (DEFAULT_SLAVE_ADDRESS)
 /* There are two types of SPAD: aperture and non-aperture. My understanding
  * is that aperture ones let it less light (they have a smaller opening), similar
  * to how you can change the aperture on a digital camera. Only 1/4 th of the
@@ -54,6 +69,18 @@ void xshut_toggle(bool state);
 bool vl53l0x_init();
 
 bool vl53l0x_read_range_single(uint16_t *range);
+
+// Configures the threshold interrupt and then starts the sensor in continuous ranging mode. In this mode the VL53L0X takes measurements autonomously and asserts its INTERRUPT pin whenever a result crosses the threshold.
+bool vl53l0x_start_continuous(void);
+
+// Halts the ranging engine and leaves the sensor idle. You must call
+// this before switching back to single-shot mode, or before putting
+// the sensor itself into hardware standby via XSHUT.
+bool vl53l0x_stop_continuous(void);
+
+// Reads the range result from the sensor and then clears the sensor's
+// internal interrupt latch, which physically releases the INTERRUPT pin
+bool vl53l0x_read_range_interrupt(uint16_t *range);
 
 
 /**************** VL53L0X REGISTER ADDRESSES ****************/
@@ -147,6 +174,24 @@ MSRC → TCC → DSS → pre-range → final-range */
 #define REG_SOFT_RESET_GO2_SOFT_RESET_N                 (0xBF) // Software reset control (active-low). Write 0x00 to assert reset; write 0x01 to release. Hardware reset via XSHUT is preferred as it guarantees a full power cycle; software reset may not clear all internal analog state.
 #define REG_IDENTIFICATION_MODEL_ID                     (0xC0) // Read-only factory-programmed device model ID. Expected value: 0xEE for all VL53L0X devices. Read at boot before any configuration to verify the device is alive and communicating correctly.
 #define REG_INTERNAL_TUNING_2                           (0xFF) // Bank/page selector. Write 0x01 to activate the alternate register bank, which remaps internal calibration registers onto the same address space. Write 0x00 to restore default bank. Always restore to 0x00 before normal operation.
+
+
+
+#ifndef XSHUT_PORT
+#error "XSHUT_PORT must be defined before including vl53l0x.h"
+#endif
+
+#ifndef XSHUT_PIN
+#error "XSHUT_PIN must be defined before including vl53l0x.h"
+#endif
+
+#ifndef VL53L0X_INT_PORT
+#error "VL53L0X_INT_PORT must be defined before including vl53l0x.h"
+#endif
+
+#ifndef VL53L0X_INT_PIN
+#error "VL53L0X_INT_PIN must be defined before including vl53l0x.h"
+#endif
 
 
 #endif /* VL53L0X_H */
