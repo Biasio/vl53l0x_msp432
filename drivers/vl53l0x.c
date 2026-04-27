@@ -2,6 +2,23 @@
 
 static uint8_t stop_variable = 0;
 
+void interrupt_gpio_init(void){
+    PORT(VL53L0X_INT_PORT)->SEL0 &= ~ONE_HOT_BIT(VL53L0X_INT_PIN);  
+    PORT(VL53L0X_INT_PORT)->SEL1 &= ~ONE_HOT_BIT(VL53L0X_INT_PIN);
+    PORT(VL53L0X_INT_PORT)->DIR  &= ~ONE_HOT_BIT(VL53L0X_INT_PIN);
+    PORT(VL53L0X_INT_PORT)->REN  |=  ONE_HOT_BIT(VL53L0X_INT_PIN);
+    
+    #if VL53L0X_INT_POLARITY == 0
+        PORT(VL53L0X_INT_PORT)->OUT  |=  ONE_HOT_BIT(VL53L0X_INT_PIN);
+        PORT(VL53L0X_INT_PORT)->IES  |=  ONE_HOT_BIT(VL53L0X_INT_PIN);
+    #else if VL53L0X_INT_POLARITY == 1
+        PORT(VL53L0X_INT_PORT)->OUT  &=  ~ONE_HOT_BIT(VL53L0X_INT_PIN);
+        PORT(VL53L0X_INT_PORT)->IES  &=  ~ONE_HOT_BIT(VL53L0X_INT_PIN);
+    #endif
+    
+    PORT(VL53L0X_INT_PORT)->IFG  &= ~ONE_HOT_BIT(VL53L0X_INT_PIN);
+}
+
 /* Check if the sensor is booted by reading the model id 
 (There is no fresh_out_of_reset as on the vl6180x) */
 static bool device_is_booted()
@@ -878,13 +895,16 @@ bool vl53l0x_start_continuous(void)
     }
 
     // Required preamble to re-arm the ranging engine
-    bool status = i2c_write(RANGE_SEQUENCE_STEP_FINAL_RANGE, 1, (uint8_t[]){0x01}, 1);
+    bool status = i2c_write(REG_SYSTEM_SEQUENCE_CONFIG, 1, 
+                    (uint8_t[]){RANGE_SEQUENCE_STEP_FINAL_RANGE}, 1);
+
     status &= i2c_write(REG_INTERNAL_TUNING_2, 1, (uint8_t[]){0x01}, 1);
     status &= i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x00}, 1);
     status &= i2c_write(REG_INTERNAL_TUNING_1, 1, (uint8_t[]){stop_variable}, 1);
     status &= i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x01}, 1);
     status &= i2c_write(REG_INTERNAL_TUNING_2, 1, (uint8_t[]){0x00}, 1);
-    status &= i2c_write(RANGE_SEQUENCE_STEP_FINAL_RANGE, 1, (uint8_t[]){0x00}, 1);
+    status &= i2c_write(REG_SYSTEM_SEQUENCE_CONFIG, 1, 
+                    (uint8_t[]){0x00}, 1);
     if (!status) return false;
 
     // bit1=1 selects continuous mode.
@@ -913,11 +933,14 @@ bool vl53l0x_read_range_interrupt(uint16_t *range)
 {
     // Read the status byte and validate before trusting the range result.
     uint8_t status_byte = 0;
-    i2c_read(REG_RESULT_RANGE_STATUS, 1, &status_byte, 1);
+    if (!i2c_read(REG_RESULT_RANGE_STATUS, 1, &status_byte, 1)) {
+        i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x01}, 1);
+        return false;
+    }
 
     uint8_t error_code = (status_byte >> 3) & 0x1F;
     if (error_code != 0x0B) {
-        // Invalid measurement or previous read failed — clear interrupt and report failure
+        // Invalid measurement — clear interrupt and report failure
         i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x01}, 1);
         return false;
     }

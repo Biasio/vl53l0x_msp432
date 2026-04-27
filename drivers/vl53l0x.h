@@ -8,22 +8,22 @@
 #include "macro.h"
 #include "config.h"
 
-
-/* START OF USER CONFIG */
-    #ifndef VL53L0X_LOW_THRESH
-    #define VL53L0X_LOW_THRESH (600U)
-    #endif
-    #ifndef VL53L0X_HIGH_THRESH
-    #define VL53L0X_HIGH_THRESH (0xFFFFU)
-    #endif
+#ifndef VL53L0X_LOW_THRESH
+#define VL53L0X_LOW_THRESH (600U)
+#endif
+#ifndef VL53L0X_HIGH_THRESH
+#define VL53L0X_HIGH_THRESH (0xFFFFU)
+#endif
 
 
-    #ifndef VL53L0X_INT_POLARITY
-    /* 0 = ACTIVE_LOW, 1 = ACTIVE_HIGH */
-    #define VL53L0X_INT_POLARITY 0  
-    #endif
+#ifndef VL53L0X_INT_POLARITY
+/* 0 = ACTIVE_LOW, 1 = ACTIVE_HIGH */
+#define VL53L0X_INT_POLARITY 0  
+#endif
 
-/* END OF USER CONFIG */
+
+/* Configure VL53L0X interrupt pin as GPIO input with pull-up, high-to-low edge */
+void interrupt_gpio_init(void);
 
 /*
 This function initializes the microcontroller pin connected to the sensor's XSHUT pin. It configures the pin as an output and pulls it low to ensure the sensor starts in hardware standby.
