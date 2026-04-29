@@ -8,8 +8,6 @@
 #include "macro.h"
 #include "config.h"
 
-
-
 void i2c_init(void);
 
 void i2c_set_slave_address(uint8_t addr);

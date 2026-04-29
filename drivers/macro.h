@@ -11,4 +11,21 @@
 
 
 
+#ifndef MCLK_HZ //used for the delay function
+#warning "MCLK_HZ not specified, defaulting to 48Mhz. Generally this is ok since it's the fastest available frequency"
+#define MCLK_HZ (48000000UL)    /* 48 MHz default */
+#endif
+
+#include <stdint.h>
+
+static inline void __delay_us(uint32_t us)
+{
+    /* Each loop iteration costs ~3 cycles so 3*1000000ULL */
+    uint64_t iterations= ( MCLK_HZ * (uint64_t) us) / 3000000ULL ;
+
+    // maybe too small ms cause a resulting iterations = 0
+    if(!iterations) iterations |= 1; //set iteration to 1
+    while (--iterations) __asm__ volatile ("nop");   // 1 cycle NOP
+}
+
 #endif
