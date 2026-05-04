@@ -11,12 +11,13 @@ void interrupt_gpio_init(void){
     #if VL53L0X_INT_POLARITY == 0
         PORT(VL53L0X_INT_PORT)->OUT  |=  ONE_HOT_BIT(VL53L0X_INT_PIN);
         PORT(VL53L0X_INT_PORT)->IES  |=  ONE_HOT_BIT(VL53L0X_INT_PIN);
-    #else if VL53L0X_INT_POLARITY == 1
+    #elif VL53L0X_INT_POLARITY == 1
         PORT(VL53L0X_INT_PORT)->OUT  &=  ~ONE_HOT_BIT(VL53L0X_INT_PIN);
         PORT(VL53L0X_INT_PORT)->IES  &=  ~ONE_HOT_BIT(VL53L0X_INT_PIN);
     #endif
     
     PORT(VL53L0X_INT_PORT)->IFG  &= ~ONE_HOT_BIT(VL53L0X_INT_PIN);
+    NVIC_ENABLE_PORT_INT(VL53L0X_INT_PORT);
 }
 
 /* Check if the sensor is booted by reading the model id 
@@ -818,7 +819,7 @@ bool vl53l0x_read_range_single(uint16_t *range)
         i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x01}, 1);
         return false;
     }
-    if ((range_status & 0x78) != 0x0B) {
+    if ((range_status & 0x78) != 0x58) {
         i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x01}, 1);
         return false;
     }
@@ -970,7 +971,7 @@ bool vl53l0x_read_range_interrupt(uint16_t *range)
         return false;
 
     // Check lower 3 bits
-    if ((status_byte & 0x78) != 0x0B) {
+    if ((status_byte & 0x78) != 0x58) {
         i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x01}, 1);
         return false;
     }

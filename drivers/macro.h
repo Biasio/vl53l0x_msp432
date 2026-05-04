@@ -1,6 +1,8 @@
 #ifndef __MACRO_H__
 #define __MACRO_H__
 
+#include <stdint.h>
+
 // Pre-glue macros for correct argument expansion
 #define PORT(port) MACRO_EXPANSION_2(P, port) // ex: PORT(2, SEL) -> P2
 #define ONE_HOT_BIT(pin) MACRO_EXPANSION_2(BIT, pin)     // ex: ONE_HOT_BIT(0)    -> BIT0
@@ -9,14 +11,13 @@
 // Glue macros (no expansion of the macros passed as arguments)
 #define GLUE2(a, b)       a ## b
 
-
+#define NVIC_ENABLE_PORT_INT(port) (NVIC->ISER[((port) + 34) / 32] = (1UL << (((port) + 34) & 0x1F)))
 
 #ifndef MCLK_HZ //used for the delay function
-#warning "MCLK_HZ not specified, defaulting to 48Mhz. Generally this is ok since it's the fastest available frequency"
-#define MCLK_HZ (48000000UL)    /* 48 MHz default */
+    #define MCLK_HZ (48000000UL)    /* 48 MHz default */
+    #warning "MCLK_HZ not specified, defaulting to 48Mhz.\ 
+        Generally this is ok since it's the fastest available frequency"
 #endif
-
-#include <stdint.h>
 
 static inline void __delay_us(uint32_t us)
 {
