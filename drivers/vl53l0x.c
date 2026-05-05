@@ -735,8 +735,8 @@ void xshut_gpio_init(void)
 
 void xshut_toggle(bool state)
 {
-    if(!state) PORT(XSHUT_PORT)->OUT |= ONE_HOT_BIT(XSHUT_PIN); //OFF
-    else PORT(XSHUT_PORT)->OUT &= ~ONE_HOT_BIT(XSHUT_PIN); //ON
+    if(state) PORT(XSHUT_PORT)->OUT |= ONE_HOT_BIT(XSHUT_PIN); //ON if from low
+    else PORT(XSHUT_PORT)->OUT &= ~ONE_HOT_BIT(XSHUT_PIN); //OFF if from high
 }
 
 
