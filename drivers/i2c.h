@@ -21,7 +21,7 @@ void i2c_recover(void);
 #define DEFAULT_SLAVE_ADDRESS (0x29)
 
 // Timeout for the WAIT_UNTIL macro 
-#define TIMEOUT 1000
+#define TIMEOUT 2000
 
 #ifndef VL53L0X_EUSCI_SEL
 #error "VL53L0X_EUSCI_SEL must be defined before including i2c.h"
