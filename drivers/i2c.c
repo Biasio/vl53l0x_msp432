@@ -3,32 +3,46 @@
 static bool start_transfer(uint16_t addr, uint8_t addr_len)
 {
     bool success=true;
+    VL53L0X_EUSCI_SEL->IFG = EUSCI_B_IFG_NACKIFG; // clear eventually a pending nack
+
     VL53L0X_EUSCI_SEL->CTLW0 |= UCTR;    // transmitter
     VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTT; // start
 
-    success &= WAIT_UNTIL(!(VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTT), TIMEOUT);
+    if ( !WAIT_UNTIL((VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_TXIFG0), TIMEOUT)){
+        VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTP; // release bus
+        return false;
+    }
+        // If slave address was NACKed, abort immediately
+    if (VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) {
+        VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTP; // release bus
+        return false;
+    }
     /* Send MSB first if 16-bit address */
     if (addr_len == 2) {
         VL53L0X_EUSCI_SEL->TXBUF = (addr >> 8) & 0xFF; //MSB
-        success = WAIT_UNTIL(!(VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTT), TIMEOUT); /* Wait for start condition to be sent */
-        /*If the slave does not acknowledge the transmitted data, the not-acknowledge interrupt flag UCNACKIFG is set*/
-        if (VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) return false;
-        success &= WAIT_UNTIL((VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_TXIFG0), TIMEOUT); /* Wait for byte to be sent */
-        /*If the slave does not acknowledge the transmitted data, the not-acknowledge interrupt flag UCNACKIFG is set*/
-        if (VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) return false;
+
+        if (!WAIT_UNTIL((VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_TXIFG0), TIMEOUT)) {
+            VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTP; // release bus
+            return false;
+        }
+        if (VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) {
+            VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTP; // release bus
+            return false;
+        }
     }
 
     /* Send LSB (or 8-bit address) */
     VL53L0X_EUSCI_SEL->TXBUF = addr & 0xFF;
-    if (addr_len == 1) {
-        success &= WAIT_UNTIL(!(VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTT), TIMEOUT);
+    if (!WAIT_UNTIL((VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_TXIFG0), TIMEOUT)) {
+        VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTP;
+        return false;
     }
-    /*If the slave does not acknowledge the transmitted data, the not-acknowledge interrupt flag UCNACKIFG is set*/
-    if (VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) return false;
+    if (VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) {
+        VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTP;
+        return false;
+    }
 
-    success &= WAIT_UNTIL((VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_TXIFG0), TIMEOUT);
-    /*If the slave does not acknowledge the transmitted data, the not-acknowledge interrupt flag UCNACKIFG is set*/
-    return !(VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) && success;
+    return true;
 }
 
 static void stop_transfer()
@@ -40,26 +54,34 @@ static void stop_transfer()
 bool i2c_read(const uint16_t addr, uint8_t addr_len, uint8_t *data, uint8_t data_len)
 {
     if (!start_transfer(addr, addr_len)) return false; // start the transfer to request data
-    bool success = true;
+    VL53L0X_EUSCI_SEL->IFG = EUSCI_B_IFG_NACKIFG; //clear eventually pending NACKs
 
     VL53L0X_EUSCI_SEL->CTLW0 &= ~UCTR;   /* Configure as receiver */
     VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTT; /* Send RESTART condition */
-    success &= WAIT_UNTIL(!(VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTT), TIMEOUT); /* Wait for start condition to be received */
-    if (VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) return false; /*If the slave does not acknowledge the transmitted data, the not-acknowledge interrupt flag UCNACKIFG is set*/
+
     for(uint16_t i = 0; i < data_len; ++i){
         if (i == data_len-1) {
             VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTP; /* Send stop before reading the last byte */
         }
-        success &= WAIT_UNTIL((VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_RXIFG0), TIMEOUT); /*The UCRXIFG0 interrupt flag is set when a character is received and loaded into UCBxRXBUF*/
+
+        if (!WAIT_UNTIL((VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_RXIFG0), TIMEOUT)) {
+            // Timeout triggered, clear any pending STOP request and abort
+            if (i == data_len - 1) VL53L0X_EUSCI_SEL->CTLW0 &= ~UCTXSTP;
+            return false;
+        }
         data[i] = VL53L0X_EUSCI_SEL->RXBUF; 
+        if (VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) { //if NACK was set
+            return false;
+        }
     }
-    return success;
+    return WAIT_UNTIL(!(VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTP), TIMEOUT);
 }
 
 
 bool i2c_write(const uint16_t addr, uint8_t addr_len, const uint8_t *data, uint8_t data_len)
 {
     if (!start_transfer(addr, addr_len)) return false; // start the transfer for adressing a slave's register
+    VL53L0X_EUSCI_SEL->IFG = EUSCI_B_IFG_NACKIFG; //clear eventually pending NACKs
     bool success = true;
     for (uint16_t i = 0; i < data_len; ++i){
         VL53L0X_EUSCI_SEL->TXBUF = data[i]; /* write a byte in the buffer */
@@ -90,8 +112,8 @@ void i2c_init()
     
     // Changed '=' to '|=' here because MSP432 uses a 16-bit CTLW0 register. 
     // '=' would overwrite and clear the UCSWRST bit we just set above.
-    VL53L0X_EUSCI_SEL->CTLW0 |= UCMST + UCSYNC + UCMODE_3;  //UCMST=1 sets Master mode, UCSYNC=1 sets Synchronous mode, UCMODE_3=1 sets I2C mode
-    VL53L0X_EUSCI_SEL->CTLW0 |= UCSSEL_2; // sets clock source, UCSSEL_2 selects SMCLK
+    VL53L0X_EUSCI_SEL->CTLW0 |= UCSWRST | UCMST | UCSYNC | EUSCI_B_CTLW0_UCMODE_3 | UCSSEL_2;  //UCMST=1 sets Master mode, UCSYNC=1 sets Synchronous mode, UCMODE_3=1 sets I2C mode
+    //VL53L0X_EUSCI_SEL->CTLW0 |= UCSSEL_2; // sets clock source, UCSSEL_2 selects SMCLK
     
     // MSP432 uses a single 16-bit BRW register
     VL53L0X_EUSCI_SEL->BRW = 30; //Bit Rate Control 12,000,000 / 30 = 400kHz (fast mode, within VL53L0X spec)
