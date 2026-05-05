@@ -21,6 +21,8 @@
 #define VL53L0X_INT_POLARITY 0  
 #endif
 
+// Must be less than 65535
+#define TIMEOUT_POLL 10000
 
 /* Configure VL53L0X interrupt pin as GPIO input with pull-up, high-to-low edge */
 void interrupt_gpio_init(void);

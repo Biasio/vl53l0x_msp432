@@ -29,4 +29,25 @@ static inline void __delay_us(uint32_t us)
     while (--iterations) __asm__ volatile ("nop");   // 1 cycle NOP
 }
 
+//MACRO to wait for a condition and set a temporal limit if this 
+//condition wouldn't occour. The condition, when true, let escape the while
+#define WAIT_UNTIL(condition, timeout_us) \
+        uint32_t _cnt = (timeout_us);     \
+        while (!(condition) && _cnt--) {  \
+            __delay_us(1);                \
+        }
+
+
+#define I2C_POLL_UNTIL(reg, data_buf, condition, timeout_us) \
+({                                                           \
+    bool _success = false;                                   \
+    uint32_t _cnt = (timeout_us);                            \
+    do {                                                     \
+        _success = i2c_read(reg, 1, data_buf, 1);            \
+        __delay_us(1);                                       \
+    } while (!(condition) && _success && --(_cnt));             \
+    if (_cnt == 0) _success = false;                         \
+    _success;                                                 \// <--- the last expression's value is assigned to the block
+})
+
 #endif

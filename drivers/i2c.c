@@ -4,13 +4,14 @@ static bool start_transfer(uint16_t addr, uint8_t addr_len)
 {
     VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTT + UCTR; /* Set up master as TX and send start condition */
 
+    WAIT_UNTIL((VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTT), TIMEOUT);
     /* Send MSB first if 16-bit address */
     if (addr_len == 2) {
         VL53L0X_EUSCI_SEL->TXBUF = (addr >> 8) & 0xFF; //MSB
-        while (VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTT); /* Wait for start condition to be sent */
+        WAIT_UNTIL(!(VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTT), TIMEOUT); /* Wait for start condition to be sent */
         /*If the slave does not acknowledge the transmitted data, the not-acknowledge interrupt flag UCNACKIFG is set*/
         if (VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) return false;
-        while (!(VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_TXIFG0)); /* Wait for byte to be sent */
+        WAIT_UNTIL((VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_TXIFG0), TIMEOUT); /* Wait for byte to be sent */
         /*If the slave does not acknowledge the transmitted data, the not-acknowledge interrupt flag UCNACKIFG is set*/
         if (VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) return false;
     }
@@ -18,12 +19,12 @@ static bool start_transfer(uint16_t addr, uint8_t addr_len)
     /* Send LSB (or 8-bit address) */
     VL53L0X_EUSCI_SEL->TXBUF = addr & 0xFF;
     if (addr_len == 1) {
-        while (VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTT);
+        WAIT_UNTIL(!(VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTT), TIMEOUT);
     }
     /*If the slave does not acknowledge the transmitted data, the not-acknowledge interrupt flag UCNACKIFG is set*/
     if (VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) return false;
 
-    while (!(VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_TXIFG0));
+    WAIT_UNTIL((VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_TXIFG0), TIMEOUT);
     /*If the slave does not acknowledge the transmitted data, the not-acknowledge interrupt flag UCNACKIFG is set*/
     return !(VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG);
 }
@@ -31,7 +32,7 @@ static bool start_transfer(uint16_t addr, uint8_t addr_len)
 static void stop_transfer()
 {
     VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTP; //Setting UCTXSTP generates a STOP condition after the next acknowledge from the slave 
-    while (VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTP); // wait for the end of the communication
+    WAIT_UNTIL(!(VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTP), TIMEOUT); // wait for the end of the communication
 }
 
 bool i2c_read(const uint16_t addr, uint8_t addr_len, uint8_t *data, uint8_t data_len)
@@ -40,13 +41,13 @@ bool i2c_read(const uint16_t addr, uint8_t addr_len, uint8_t *data, uint8_t data
 
     VL53L0X_EUSCI_SEL->CTLW0 &= ~UCTR;   /* Configure as receiver */
     VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTT; /* Send RESTART condition */
-    while (VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTT); /* Wait for start condition to be received */
+    WAIT_UNTIL(!(VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTT), TIMEOUT); /* Wait for start condition to be received */
     if (VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) return false; /*If the slave does not acknowledge the transmitted data, the not-acknowledge interrupt flag UCNACKIFG is set*/
     for(uint16_t i = 0; i < data_len; ++i){
         if (i == data_len-1) {
             VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTP; /* Send stop before reading the last byte */
         }
-        while (!(VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_RXIFG0)); /*The UCRXIFG0 interrupt flag is set when a character is received and loaded into UCBxRXBUF*/
+        WAIT_UNTIL((VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_RXIFG0), TIMEOUT); /*The UCRXIFG0 interrupt flag is set when a character is received and loaded into UCBxRXBUF*/
         data[i] = VL53L0X_EUSCI_SEL->RXBUF; 
     }
     return true;
@@ -62,7 +63,7 @@ bool i2c_write(const uint16_t addr, uint8_t addr_len, const uint8_t *data, uint8
         /* CTXIFG2 is set when UCBxTXBUF is empty
         in slave mode, if the slave address defined in UCBxI2COA2 was on the bus in
         the same frame. */
-        while (!(VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_TXIFG0)); 
+        WAIT_UNTIL((VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_TXIFG0), TIMEOUT); 
         /*If the slave does not acknowledge the transmitted data, the not-acknowledge interrupt flag UCNACKIFG is set*/
         if (VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) {
             stop_transfer();
@@ -106,3 +107,9 @@ MSB and bits 9-7 are ignored. In 10-bit slave addressing mode, bit 9 is the MSB.
     VL53L0X_EUSCI_SEL->I2CSA = addr; 
 }
 
+void i2c_recover(void) {
+    VL53L0X_EUSCI_SEL->CTLW0 |= UCSWRST;   // put eUSCI in reset
+    // Optionally bit‑bang a few clock pulses to free the bus
+    VL53L0X_EUSCI_SEL->CTLW0 &= ~UCSWRST;  // release reset
+    // Re‑configure as before
+}

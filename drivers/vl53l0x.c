@@ -105,11 +105,9 @@ static bool read_strobe()
     {
         return false;
     }
-    do {
-        success = i2c_read(
-            REG_NVM_READ_STROBE, 1, 
-            &strobe, 1);
-    } while (success && (strobe == 0));
+
+    success = I2C_POLL_UNTIL(REG_NVM_READ_STROBE, &strobe, (strobe == 0), TIMEOUT_POLL);
+    
     if (!success) {
         return false;
     }
@@ -314,9 +312,9 @@ static bool set_spads_from_nvm()
     return true;
 }
 
-/**
- * Load tuning settings (same as default tuning settings provided by ST api code)
- */
+/*
+Load tuning settings (same as default tuning settings provided by Pololu library
+*/
 static bool load_default_tuning_settings()
 {
     bool success = i2c_write(
@@ -337,15 +335,12 @@ static bool load_default_tuning_settings()
     success &= i2c_write(
         REG_SYSTEM_GROUPED_PARAM_HOLD, 1, 
         (uint8_t[]){0x00}, 1);
-        /*
     success &= i2c_write(
-        REG_PRE_RANGE_CONFIG_VALID_PHASE_HIGH, 1, 
+        0x24, 1, 
         (uint8_t[]){0x01}, 1);
     success &= i2c_write(
-        REG_PRE_RANGE_CONFIG_VALID_PHASE_LOW, 1, 
-        (uint8_t[]){0xFF}, 1);*/
-    success &= i2c_write(0x24, 1, (uint8_t[]){0x01}, 1);
-    success &= i2c_write(0x25, 1, (uint8_t[]){0xFF}, 1);
+        0x25, 1, 
+        (uint8_t[]){0xFF}, 1);
     success &= i2c_write(
         REG_OSC_CALIBRATE_VAL, 1, 
         (uint8_t[]){0x00}, 1);
@@ -545,9 +540,6 @@ static bool load_default_tuning_settings()
         REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
         (uint8_t[]){0x01}, 1);
     success &= i2c_write(
-        REG_SYSTEM_SEQUENCE_CONFIG, 1, 
-        (uint8_t[]){0xF8}, 1);
-    success &= i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x01}, 1);
     success &= i2c_write(
@@ -661,11 +653,9 @@ static bool perform_single_ref_calibration(calibration_type_t calib_type)
     /* Wait for interrupt */
     uint8_t interrupt_status = 0;
     bool success = false;
-    do {
-        success = i2c_read(
-            REG_RESULT_INTERRUPT_STATUS, 1, 
-            &interrupt_status, 1);
-    } while (success && ((interrupt_status & 0x07) == 0));
+
+    success = I2C_POLL_UNTIL(REG_RESULT_INTERRUPT_STATUS, &interrupt_status, ((interrupt_status & 0x07) == 0), TIMEOUT_POLL);
+
     if (!success) {
         return false;
     }
@@ -794,11 +784,9 @@ bool vl53l0x_read_range_single(uint16_t *range)
     }
 
     uint8_t sysrange_start = 0;
-    do {
-        success = i2c_read(
-            REG_SYSRANGE_START, 1, 
-            &sysrange_start, 1);
-    } while (success && (sysrange_start & 0x01));
+
+    success = I2C_POLL_UNTIL(REG_SYSRANGE_START, &sysrange_start, (sysrange_start & 0x01), TIMEOUT_POLL);
+
     if (!success) {
         return false;
     }
@@ -809,6 +797,9 @@ bool vl53l0x_read_range_single(uint16_t *range)
             REG_RESULT_INTERRUPT_STATUS, 1, 
             &interrupt_status, 1);
     } while (success && ((interrupt_status & 0x07) == 0));
+
+    success = I2C_POLL_UNTIL(REG_RESULT_INTERRUPT_STATUS, &interrupt_status, ((interrupt_status & 0x07) == 0), TIMEOUT_POLL);
+
     if (!success) {
         return false;
     }
