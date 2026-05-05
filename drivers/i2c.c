@@ -10,11 +10,13 @@ static bool start_transfer(uint16_t addr, uint8_t addr_len)
 
     if ( !WAIT_UNTIL((VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_TXIFG0), TIMEOUT)){
         VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTP; // release bus
+        WAIT_UNTIL(!(VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTP), TIMEOUT);
         return false;
     }
         // If slave address was NACKed, abort immediately
     if (VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) {
         VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTP; // release bus
+        WAIT_UNTIL(!(VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTP), TIMEOUT);
         return false;
     }
     /* Send MSB first if 16-bit address */
@@ -23,10 +25,12 @@ static bool start_transfer(uint16_t addr, uint8_t addr_len)
 
         if (!WAIT_UNTIL((VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_TXIFG0), TIMEOUT)) {
             VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTP; // release bus
+            WAIT_UNTIL(!(VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTP), TIMEOUT);
             return false;
         }
         if (VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) {
             VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTP; // release bus
+            WAIT_UNTIL(!(VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTP), TIMEOUT);
             return false;
         }
     }
@@ -35,10 +39,12 @@ static bool start_transfer(uint16_t addr, uint8_t addr_len)
     VL53L0X_EUSCI_SEL->TXBUF = addr & 0xFF;
     if (!WAIT_UNTIL((VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_TXIFG0), TIMEOUT)) {
         VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTP;
+        WAIT_UNTIL(!(VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTP), TIMEOUT);
         return false;
     }
     if (VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) {
         VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTP;
+        WAIT_UNTIL(!(VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTP), TIMEOUT);
         return false;
     }
 
@@ -53,7 +59,7 @@ static void stop_transfer()
 
 bool i2c_read(const uint16_t addr, uint8_t addr_len, uint8_t *data, uint8_t data_len)
 {
-    if (!start_transfer(addr, addr_len)) return false; // start the transfer to request data
+    if (!start_transfer(addr, addr_len)) {i2c_recover(); return false;} // start the transfer to request data
     VL53L0X_EUSCI_SEL->IFG &= ~EUSCI_B_IFG_NACKIFG; //clear eventually pending NACKs
 
     VL53L0X_EUSCI_SEL->CTLW0 &= ~UCTR;   /* Configure as receiver */
@@ -66,13 +72,13 @@ bool i2c_read(const uint16_t addr, uint8_t addr_len, uint8_t *data, uint8_t data
 
         if (!WAIT_UNTIL((VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_RXIFG0), TIMEOUT)) {
             // Timeout triggered, clear any pending STOP request and abort
-            if (i == data_len - 1) VL53L0X_EUSCI_SEL->CTLW0 &= ~UCTXSTP;
+            VL53L0X_EUSCI_SEL->CTLW0 &= ~UCTXSTP;
             return false;
         }
-        data[i] = VL53L0X_EUSCI_SEL->RXBUF; 
         if (VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) { //if NACK was set
             return false;
         }
+        data[i] = VL53L0X_EUSCI_SEL->RXBUF; 
     }
     return WAIT_UNTIL(!(VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTP), TIMEOUT);
 }
@@ -119,6 +125,7 @@ void i2c_init()
     VL53L0X_EUSCI_SEL->BRW = 30; //Bit Rate Control 12,000,000 / 30 = 400kHz (fast mode, within VL53L0X spec)
     
     VL53L0X_EUSCI_SEL->CTLW0 &= ~UCSWRST;  //eUSCI reset released for operation
+    
     i2c_set_slave_address(DEFAULT_SLAVE_ADDRESS); // set default slave address
 }
 
