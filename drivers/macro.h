@@ -36,7 +36,7 @@ static inline void __delay_us(uint32_t us)
         uint32_t _cnt = (timeout_us);     \
         while (!(condition) && _cnt--) {  \
             __delay_us(1);                \
-        }
+        }                                 \
 })
 
 
@@ -47,9 +47,9 @@ static inline void __delay_us(uint32_t us)
     do {                                                     \
         _success = i2c_read(reg, 1, data_buf, 1);            \
         __delay_us(1);                                       \
-    } while (!(condition) && _success && --(_cnt));             \
+    } while (!(condition) && _success && --(_cnt));          \
     if (_cnt == 0) _success = false;                         \
-    _success;                                                 \
+    _success;                                                \
 })
 
 #endif
