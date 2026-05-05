@@ -701,11 +701,9 @@ static bool init_address()
     xshut_toggle(true);
     i2c_set_slave_address(VL53L0X_DEFAULT_ADDRESS);
 
-    __delay_us(2300);
-
-    if (!device_is_booted()) return false;
-
-    return true;
+    WAIT_UNTIL(device_is_booted(), 5000);
+    
+    return device_is_booted();
 }
 
 
