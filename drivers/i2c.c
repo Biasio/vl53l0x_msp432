@@ -3,7 +3,7 @@
 static bool start_transfer(uint16_t addr, uint8_t addr_len)
 {
     bool success=true;
-    VL53L0X_EUSCI_SEL->IFG = EUSCI_B_IFG_NACKIFG; // clear eventually a pending nack
+    VL53L0X_EUSCI_SEL->IFG &= ~EUSCI_B_IFG_NACKIFG; // clear eventually a pending nack
 
     VL53L0X_EUSCI_SEL->CTLW0 |= UCTR;    // transmitter
     VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTT; // start
@@ -54,7 +54,7 @@ static void stop_transfer()
 bool i2c_read(const uint16_t addr, uint8_t addr_len, uint8_t *data, uint8_t data_len)
 {
     if (!start_transfer(addr, addr_len)) return false; // start the transfer to request data
-    VL53L0X_EUSCI_SEL->IFG = EUSCI_B_IFG_NACKIFG; //clear eventually pending NACKs
+    VL53L0X_EUSCI_SEL->IFG &= ~EUSCI_B_IFG_NACKIFG; //clear eventually pending NACKs
 
     VL53L0X_EUSCI_SEL->CTLW0 &= ~UCTR;   /* Configure as receiver */
     VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTT; /* Send RESTART condition */
@@ -81,7 +81,7 @@ bool i2c_read(const uint16_t addr, uint8_t addr_len, uint8_t *data, uint8_t data
 bool i2c_write(const uint16_t addr, uint8_t addr_len, const uint8_t *data, uint8_t data_len)
 {
     if (!start_transfer(addr, addr_len)) return false; // start the transfer for adressing a slave's register
-    VL53L0X_EUSCI_SEL->IFG = EUSCI_B_IFG_NACKIFG; //clear eventually pending NACKs
+    VL53L0X_EUSCI_SEL->IFG &= ~EUSCI_B_IFG_NACKIFG; //clear eventually pending NACKs
     bool success = true;
     for (uint16_t i = 0; i < data_len; ++i){
         VL53L0X_EUSCI_SEL->TXBUF = data[i]; /* write a byte in the buffer */
