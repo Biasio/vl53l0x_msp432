@@ -38,8 +38,6 @@ static bool device_is_booted()
 /* One time I2C device initialization */
 static bool data_init()
 {
-    bool success = true;
-
     /* Set 3V3 mode */
     // first read the register to keep the other register's bits intact
     uint8_t vhv_config_scl_sda = 0;
@@ -58,37 +56,61 @@ static bool data_init()
     }
 
     /* Set I2C standard mode */
-    success &= i2c_write(
+    if (! i2c_write(
         REG_I2C_MODE, 1, 
-        (uint8_t[]){0x00}, 1);
+        (uint8_t[]){0x00}, 1))
+    {
+        return false;
+    }
 
-    success &= i2c_write(
+     if (! i2c_write(
         REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
-        (uint8_t[]){0x01}, 1);
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
 
-    success &= i2c_write(
+    if (! i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x01}, 1);
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
     
-    success &= i2c_write(
+    if (! i2c_write(
         REG_SYSRANGE_START, 1, 
-        (uint8_t[]){0x00}, 1);
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
     /* It may be unnecessary to retrieve the stop variable for each sensor */
-    success &= i2c_read(
+    if (! i2c_read(
         REG_INTERNAL_TUNING_1, 1, 
-        &stop_variable, 1);
+        &stop_variable, 1)) 
+    {
+        return false;
+    }
 
-    success &= i2c_write(
+    if (! i2c_write(
         REG_SYSRANGE_START, 1, 
-        (uint8_t[]){0x01}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
+    if (! i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (! i2c_write(
         REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
-        (uint8_t[]){0x00}, 1);
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
 
-    return success;
+    return true;
 }
 
 /**
