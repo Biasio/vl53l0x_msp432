@@ -2,7 +2,7 @@
 #define CONFIG_H
 
 // VL53L0X  driver's macro definitions
-#define XSHUT_PORT 1
+#define XSHUT_PORT 4
 #define XSHUT_PIN 1
 #define VL53L0X_INT_PORT 4  // interrupt port
 #define VL53L0X_INT_PIN 6   // interrupt pin
