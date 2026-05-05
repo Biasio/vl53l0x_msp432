@@ -112,7 +112,7 @@ void i2c_init()
     
     // Changed '=' to '|=' here because MSP432 uses a 16-bit CTLW0 register. 
     // '=' would overwrite and clear the UCSWRST bit we just set above.
-    VL53L0X_EUSCI_SEL->CTLW0 |= UCSWRST | UCMST | UCSYNC | EUSCI_B_CTLW0_UCMODE_3 | UCSSEL_2;  //UCMST=1 sets Master mode, UCSYNC=1 sets Synchronous mode, UCMODE_3=1 sets I2C mode
+    VL53L0X_EUSCI_SEL->CTLW0 |= UCSWRST | UCMST | UCSYNC | UCMODE_3 | UCSSEL_2;  //UCMST=1 sets Master mode, UCSYNC=1 sets Synchronous mode, UCMODE_3=1 sets I2C mode
     //VL53L0X_EUSCI_SEL->CTLW0 |= UCSSEL_2; // sets clock source, UCSSEL_2 selects SMCLK
     
     // MSP432 uses a single 16-bit BRW register
