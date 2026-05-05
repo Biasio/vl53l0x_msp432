@@ -47,7 +47,7 @@ static inline void __delay_us(uint32_t us)
         __delay_us(1);                                       \
     } while (!(condition) && _success && --(_cnt));             \
     if (_cnt == 0) _success = false;                         \
-    _success;                                                 \// <--- the last expression's value is assigned to the block
+    _success;                                                 \
 })
 
 #endif
