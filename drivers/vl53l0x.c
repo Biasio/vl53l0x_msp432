@@ -38,7 +38,7 @@ static bool device_is_booted()
 /* One time I2C device initialization */
 static bool data_init()
 {
-    bool success = false;
+    bool success = true;
 
     /* Set 3V3 mode */
     // first read the register to keep the other register's bits intact
@@ -58,7 +58,7 @@ static bool data_init()
     }
 
     /* Set I2C standard mode */
-    success = i2c_write(
+    success &= i2c_write(
         REG_I2C_MODE, 1, 
         (uint8_t[]){0x00}, 1);
 
@@ -135,13 +135,13 @@ static bool read_strobe()
  */
 static bool get_spad_info_from_nvm(uint8_t *spad_count, uint8_t *spad_type, uint8_t good_spad_map[6])
 {
-    bool success = false;
+    bool success = true;
     uint8_t tmp_data8 = 0;
     uint32_t tmp_data32 = 0;
     uint8_t buf[4] = {0};
 
     /* Setup to read from NVM */
-    success  = i2c_write(
+    success &= i2c_write(
         REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
         (uint8_t[]){0x01}, 1);
     success &= i2c_write(
