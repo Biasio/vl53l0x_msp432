@@ -2,9 +2,10 @@
 
 static bool start_transfer(uint16_t addr, uint8_t addr_len)
 {
-    VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTT + UCTR; /* Set up master as TX and send start condition */
+    VL53L0X_EUSCI_SEL->CTLW0 |= UCTR;    // transmitter
+    VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTT; // start
 
-    WAIT_UNTIL((VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTT), TIMEOUT);
+    WAIT_UNTIL(!(VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTT), TIMEOUT);
     /* Send MSB first if 16-bit address */
     if (addr_len == 2) {
         VL53L0X_EUSCI_SEL->TXBUF = (addr >> 8) & 0xFF; //MSB
