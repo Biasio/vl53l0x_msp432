@@ -2,6 +2,7 @@
 #define __MACRO_H__
 
 #include <stdint.h>
+#include "config.h"
 
 // Pre-glue macros for correct argument expansion
 #define PORT(port) MACRO_EXPANSION_2(P, port) // ex: PORT(2, SEL) -> P2
