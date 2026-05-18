@@ -21,7 +21,7 @@
 
 #define VL53L0X_INT_POLARITY 0  // 0 = active-low; 1 = active-high
 
-#define SMCLK_HZ (3000000UL) // SMCLK frequency in Hz
+#define SMCLK_HZ (12000000UL) // SMCLK frequency in Hz
 #define SCK_FREQ_HZ (400000UL) // I2C clock frequency in Hz (400kHz or 100kHz)
 
 #endif
