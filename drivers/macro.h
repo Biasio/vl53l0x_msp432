@@ -19,6 +19,8 @@
         Generally this is ok since it's the fastest available frequency"
 #endif
 
+
+
 static inline void __delay_us(uint32_t us)
 {
     /* Each loop iteration costs ~3 cycles so 3*1000000ULL */
@@ -52,5 +54,20 @@ static inline void __delay_us(uint32_t us)
     if (_cnt == 0) _success = false;                         \
     _success;                                                \
 })
+
+// computed for 400kHz I2C clock, which is the maximum supported by the VL53L0X
+#ifdef SMCLK_HZ
+    #define SCK_DIVIDER ((SMCLK_HZ)/(SCK_FREQ_HZ))
+#endif
+
+//used for the sck frequency of the I2C bus
+#ifndef SMCLK_HZ 
+#error "SMCLK_HZ not specified."
+#endif
+
+//used for the sck frequency of the I2C bus
+#ifndef SCK_FREQ_HZ
+#error "SCK_FREQ_HZ not specified."
+#endif
 
 #endif
