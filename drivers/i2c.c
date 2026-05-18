@@ -1,6 +1,49 @@
 #include "i2c.h"
 
 
+static inline bool stop_transfer(void)
+{
+    VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTP; //Setting UCTXSTP generates a STOP condition after the next acknowledge from the slave 
+    WAIT_UNTIL(!(VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTP), TIMEOUT); // wait for the end of the communication
+    return false;
+}
+
+
+
+static bool start_transfer(uint16_t addr, uint8_t addr_len)
+{
+    WAIT_UNTIL(!(VL53L0X_EUSCI_SEL->STATW & UCBBUSY), TIMEOUT); // wait until the bus is free
+
+    // Clear stale flags
+    VL53L0X_EUSCI_SEL->IFG &= ~(EUSCI_B_IFG_NACKIFG | EUSCI_B_IFG_TXIFG0 |
+                                 EUSCI_B_IFG_RXIFG0 | EUSCI_B_IFG_STTIFG |
+                                 EUSCI_B_IFG_STPIFG);
+
+    VL53L0X_EUSCI_SEL->CTLW0 |= UCTR;    // transmitter mode
+    VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTT; // start
+    
+    __delay_us(50); // Short delay to allow the start condition and the address to be sent.
+
+    // if SLAVE address was NACKed, abort
+    if (VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) return stop_transfer();
+    
+    uint8_t shift_count;
+    while(addr_len-- > 0){
+        //start from the MSB
+        shift_count = (addr_len << 3); // *8
+        VL53L0X_EUSCI_SEL->TXBUF = (addr >> shift_count) & 0xFF;
+
+        //wait for the byte to be copied to the shift register
+        if (!WAIT_UNTIL((VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_TXIFG0), TIMEOUT)) return stop_transfer();
+
+        //if the transmission was NaCKed, abort
+        if (VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) return stop_transfer();
+    }
+    return true;
+}
+
+
+
 void i2c_init()
 {
     // Primary function selection -> I2C
@@ -106,43 +149,4 @@ void i2c_recover(void) {
 
 
 
-static inline bool stop_transfer(void)
-{
-    VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTP; //Setting UCTXSTP generates a STOP condition after the next acknowledge from the slave 
-    WAIT_UNTIL(!(VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTP), TIMEOUT); // wait for the end of the communication
-    return false;
-}
 
-
-
-static bool start_transfer(uint16_t addr, uint8_t addr_len)
-{
-    WAIT_UNTIL(!(VL53L0X_EUSCI_SEL->STATW & UCBBUSY), TIMEOUT); // wait until the bus is free
-
-    // Clear stale flags
-    VL53L0X_EUSCI_SEL->IFG &= ~(EUSCI_B_IFG_NACKIFG | EUSCI_B_IFG_TXIFG0 |
-                                 EUSCI_B_IFG_RXIFG0 | EUSCI_B_IFG_STTIFG |
-                                 EUSCI_B_IFG_STPIFG);
-
-    VL53L0X_EUSCI_SEL->CTLW0 |= UCTR;    // transmitter mode
-    VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTT; // start
-    
-    __delay_us(50); // Short delay to allow the start condition and the address to be sent.
-
-    // if SLAVE address was NACKed, abort
-    if (VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) return stop_transfer();
-    
-    uint8_t shift_count;
-    while(addr_len-- > 0){
-        //start from the MSB
-        shift_count = (addr_len << 3); // *8
-        VL53L0X_EUSCI_SEL->TXBUF = (addr >> shift_count) & 0xFF;
-
-        //wait for the byte to be copied to the shift register
-        if (!WAIT_UNTIL((VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_TXIFG0), TIMEOUT)) return stop_transfer();
-
-        //if the transmission was NaCKed, abort
-        if (VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) return stop_transfer();
-    }
-    return true;
-}
