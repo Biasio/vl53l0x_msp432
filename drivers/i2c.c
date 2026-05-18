@@ -48,9 +48,19 @@ void i2c_init()
 {
     // Primary function selection -> I2C
     PORT(VL53L0X_SDA_PORT)->SEL0 |= ONE_HOT_BIT(VL53L0X_SDA_PIN); //1
-    PORT(VL53L0X_SCL_PORT)->SEL0 |= ONE_HOT_BIT(VL53L0X_SCL_PIN); //1
     PORT(VL53L0X_SDA_PORT)->SEL1 &= ~ONE_HOT_BIT(VL53L0X_SDA_PIN); //0
+    PORT(VL53L0X_SDA_PORT)->REN  |=  ONE_HOT_BIT(VL53L0X_SDA_PIN); // enable resistor
+    PORT(VL53L0X_SDA_PORT)->OUT  |=  ONE_HOT_BIT(VL53L0X_SDA_PIN); // pull-up (1 = pull-up, 0 = pull-down)
+    PORT(VL53L0X_SDA_PORT)->IE   &= ~ONE_HOT_BIT(VL53L0X_SDA_PIN); // disable interrupt
+    PORT(VL53L0X_SDA_PORT)->IFG  &= ~ONE_HOT_BIT(VL53L0X_SDA_PIN); // clear any pending flag
+    
+    // Primary function selection -> I2C
+    PORT(VL53L0X_SCL_PORT)->SEL0 |= ONE_HOT_BIT(VL53L0X_SCL_PIN); //1
     PORT(VL53L0X_SCL_PORT)->SEL1 &= ~ONE_HOT_BIT(VL53L0X_SCL_PIN); //0
+    PORT(VL53L0X_SCL_PORT)->REN  |=  ONE_HOT_BIT(VL53L0X_SCL_PIN); // enable resistor
+    PORT(VL53L0X_SCL_PORT)->OUT  |=  ONE_HOT_BIT(VL53L0X_SCL_PIN); // pull-up (1 = pull-up, 0 = pull-down)
+    PORT(VL53L0X_SCL_PORT)->IE   &= ~ONE_HOT_BIT(VL53L0X_SCL_PIN); // disable interrupt
+    PORT(VL53L0X_SCL_PORT)->IFG  &= ~ONE_HOT_BIT(VL53L0X_SCL_PIN); // clear any pending flag
 
     //eUSCI logic held in reset state (enable modifications)
     VL53L0X_EUSCI_SEL->CTLW0 |= UCSWRST; 
