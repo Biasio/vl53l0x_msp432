@@ -77,7 +77,7 @@ bool i2c_write(const uint16_t addr, uint8_t addr_len, const uint8_t *data, uint8
         if (VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) return stop_transfer();
     }
     stop_transfer();
-    return success;
+    return true;
 }
 
 
