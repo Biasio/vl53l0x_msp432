@@ -16,7 +16,7 @@
 
 #define VL53L0X_ADDRESS (0x29)
 
-#define VL53L0X_LOW_THRESH (60U)
+#define VL53L0X_LOW_THRESH (0x6000U)
 #define VL53L0X_HIGH_THRESH (0xFFFFU)
 
 #define VL53L0X_INT_POLARITY 0  // 0 = active-low; 1 = active-high

@@ -101,11 +101,7 @@ bool i2c_read(const uint16_t addr, uint8_t addr_len, uint8_t *data, uint8_t data
     // Wait for the start condition to be sent
     if (!WAIT_UNTIL(!(VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTT), TIMEOUT))
         return stop_transfer();
-/*
-    // Wait for address to be copied to the shift register
-    if (!WAIT_UNTIL((VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_TXIFG0), TIMEOUT))
-        return stop_transfer();
-*/
+
     // if SLAVE address was NACKed, abort
     if (VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) return stop_transfer();
 

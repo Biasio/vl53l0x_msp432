@@ -1327,40 +1327,6 @@ bool vl53l0x_stop_continuous(void)
         if (!i2c_read(REG_SYSRANGE_START, 1, &val, 1)) return false;
     } while (val & 0x01);
 
-    /*
-    if (!i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x01}, 1))
-    {
-        return false;
-    }
-    if (!i2c_write(REG_POWER_MANAGEMENT_GO1_POWER_FORCE, 1, (uint8_t[]){0x01}, 1))
-    {
-        return false;
-    }
-    if (!i2c_write(REG_INTERNAL_TUNING_2, 1, (uint8_t[]){0x01}, 1))
-    {
-        return false;
-    }
-    if (!i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x00}, 1))
-    {
-        return false;
-    }
-    if (!i2c_write(REG_INTERNAL_TUNING_1, 1, (uint8_t[]){0x00}, 1))
-    {
-        return false;
-    }
-    if (!i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x01}, 1))
-    {
-        return false;
-    }
-    if (!i2c_write(REG_INTERNAL_TUNING_2, 1, (uint8_t[]){0x00}, 1))
-    {
-        return false;
-    }
-    if (!i2c_write(REG_POWER_MANAGEMENT_GO1_POWER_FORCE, 1, (uint8_t[]){0x00}, 1))
-    {
-        return false;
-    }*/
-
     return true;
 }
 
