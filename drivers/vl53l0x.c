@@ -128,7 +128,7 @@ static bool read_strobe()
     }
 
     if (!I2C_POLL_UNTIL(REG_NVM_READ_STROBE, &strobe, 
-            (strobe == 0), TIMEOUT_POLL))
+            (strobe != 0), TIMEOUT_POLL))
     {
         return false;
     }
