@@ -1068,7 +1068,7 @@ bool vl53l0x_init()
 
 bool vl53l0x_read_range_single(uint16_t *range)
 {
-    if(!xshut_toggle(true)) return false; //check if device is booted after toggling XSHUT pin
+    if(!device_is_booted()) return false; //check if device is booted
 
     i2c_set_slave_address(VL53L0X_DEFAULT_ADDRESS);
     if (!i2c_write(
@@ -1180,7 +1180,7 @@ bool vl53l0x_read_range_single(uint16_t *range)
 // Sets the VL53L0X GPIO interrupt to fire in "level low" mode, meaning the INT pin asserts whenever the measured distance fall out of the threshold window.
 static bool configure_LowThresh_interrupt(void)
 {
-    if(!xshut_toggle(true)) return false; //check if device is booted after toggling XSHUT pin
+    if(!device_is_booted()) return false; //check if device is booted
 
     if (!configure_interrupt(0x01)) {
         return false;
@@ -1233,8 +1233,8 @@ static bool configure_LowThresh_interrupt(void)
 
 bool vl53l0x_start_continuous(void)
 {
-    if(!xshut_toggle(true)) return false; //check if device is booted after toggling XSHUT pin
-
+    if(!device_is_booted()) return false; //check if device is booted
+/*
     if (!i2c_write(
         REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
         (uint8_t[]){0x01}, 1)) 
@@ -1280,7 +1280,7 @@ bool vl53l0x_start_continuous(void)
     // Configure the threshold-based interrupt before starting ranging
     if (!configure_LowThresh_interrupt()) {
         return false;
-    }
+    }*/
     // Ensure the sensor is idle
     if (!i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x01}, 1)) {
         return false;
@@ -1298,8 +1298,18 @@ bool vl53l0x_start_continuous(void)
 
 bool vl53l0x_stop_continuous(void)
 {
-    if(!xshut_toggle(true)) return false; //check if device is booted after toggling XSHUT pin
+    if(!device_is_booted()) return false; //check if device is booted
 
+    if (!i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x01}, 1)) {
+        return false;
+    }
+    // Wait for stop to complete
+    uint8_t val=0x00;
+    do {
+        if (!i2c_read(REG_SYSRANGE_START, 1, &val, 1)) return false;
+    } while (val & 0x01);
+
+    /*
     if (!i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x01}, 1))
     {
         return false;
@@ -1331,7 +1341,7 @@ bool vl53l0x_stop_continuous(void)
     if (!i2c_write(REG_POWER_MANAGEMENT_GO1_POWER_FORCE, 1, (uint8_t[]){0x00}, 1))
     {
         return false;
-    }
+    }*/
 
     return true;
 }
@@ -1340,7 +1350,7 @@ bool vl53l0x_stop_continuous(void)
 
 bool vl53l0x_read_range_interrupt(uint16_t *range)
 {
-    if(!xshut_toggle(true)) return false; //check if device is booted after toggling XSHUT pin
+    if(!device_is_booted()) return false; //check if device is booted
 
     // Read the status byte and validate before trusting the range result.
     uint8_t status_byte;
