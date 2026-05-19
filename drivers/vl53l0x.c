@@ -1244,7 +1244,7 @@ bool vl53l0x_read_range_single(uint16_t *range)
 bool vl53l0x_start_continuous(void)
 {
     if(!device_is_booted()) return false; //check if device is booted
-/*
+
     if (!i2c_write(
         REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
         (uint8_t[]){0x01}, 1)) 
@@ -1287,23 +1287,19 @@ bool vl53l0x_start_continuous(void)
     {
         return false;
     }
-    // Configure the threshold-based interrupt before starting ranging
-    if (!configure_LowThresh_interrupt()) {
-        return false;
-    }*/
-
     
-
-    // Ensure the sensor is idle
-    if (!i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x01}, 1)) {
-        return false;
-    }
-    // Wait for stop to complete
     uint8_t val=0x00;
-    do {
-        if (!i2c_read(REG_SYSRANGE_START, 1, &val, 1)) return false;
-    } while (val & 0x01);
-
+    if (!i2c_read(REG_SYSRANGE_START, 1, &val, 1)) return false;
+    if (val & 0x01){ //if it was in single mode, we need to stop it first before starting continuous mode
+        // Ensure the sensor is idle
+        if (!i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x01}, 1)) {
+            return false;
+        }
+        // Wait for stop to complete
+        do {
+            if (!i2c_read(REG_SYSRANGE_START, 1, &val, 1)) return false;
+        } while (val & 0x01);
+    }   
     // Start continuous ranging
     return i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x02}, 1);
 }
