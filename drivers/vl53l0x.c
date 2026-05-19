@@ -119,7 +119,6 @@ static bool data_init()
  */
 static bool read_strobe()
 {
-    bool success = false;
     uint8_t strobe = 0;
     if (!i2c_write(
             REG_NVM_READ_STROBE, 1, 
@@ -128,11 +127,8 @@ static bool read_strobe()
         return false;
     }
 
-    success = I2C_POLL_UNTIL(REG_NVM_READ_STROBE, &strobe, (strobe == 0), TIMEOUT_POLL);
-    
-    if (!success) {
-        return false;
-    }
+    if (!I2C_POLL_UNTIL(REG_NVM_READ_STROBE, &strobe, (strobe == 0), TIMEOUT_POLL)) return false;
+
     if (!i2c_write(
             REG_NVM_READ_STROBE, 1, 
             (uint8_t[]){0x01}, 1)) 
@@ -287,6 +283,7 @@ static bool set_spads_from_nvm()
     success &= i2c_write(
         REG_GLOBAL_CONFIG_REF_EN_START_SELECT, 1, 
         (uint8_t[]){SPAD_START_SELECT}, 1);
+    
     if (!success) {
         return false;
     }
@@ -674,13 +671,9 @@ static bool perform_single_ref_calibration(calibration_type_t calib_type)
     }
     /* Wait for interrupt */
     uint8_t interrupt_status = 0;
-    bool success = false;
 
-    success = I2C_POLL_UNTIL(REG_RESULT_INTERRUPT_STATUS, &interrupt_status, ((interrupt_status & 0x07) == 0), TIMEOUT_POLL);
+    if (!I2C_POLL_UNTIL(REG_RESULT_INTERRUPT_STATUS, &interrupt_status, ((interrupt_status & 0x07) == 0), TIMEOUT_POLL)) return false;
 
-    if (!success) {
-        return false;
-    }
     if (!i2c_write(
             REG_SYSTEM_INTERRUPT_CLEAR, 1, 
             (uint8_t[]){0x01}, 1)) {
@@ -982,7 +975,7 @@ bool vl53l0x_stop_continuous(void)
 bool vl53l0x_read_range_interrupt(uint16_t *range)
 {
     if(!xshut_toggle(true)) return false; //check if device is booted after toggling XSHUT pin
-    
+
     // Read the status byte and validate before trusting the range result.
     uint8_t status_byte;
     if (!i2c_read(REG_RESULT_RANGE_STATUS, 1, &status_byte, 1))
