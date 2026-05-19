@@ -5,6 +5,7 @@ static inline bool stop_transfer(void)
 {
     VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTP; //Setting UCTXSTP generates a STOP condition after the next acknowledge from the slave 
     WAIT_UNTIL(!(VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTP), TIMEOUT); // wait for the end of the communication
+    __delay_us(100); // small delay to ensure the bus is free before returning
     return false;
 }
 
@@ -22,7 +23,13 @@ static bool start_transfer(uint16_t addr, uint8_t addr_len)
     VL53L0X_EUSCI_SEL->CTLW0 |= UCTR;    // transmitter mode
     VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTT; // start
     
-    __delay_us(50); // Short delay to allow the start condition and the address to be sent.
+    // Wait for the start condition to be sent
+    if (!WAIT_UNTIL(!(VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTT), TIMEOUT))
+        return stop_transfer();
+
+    // Wait for address to be copied to the shift register
+    if (!WAIT_UNTIL((VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_TXIFG0), TIMEOUT))
+        return stop_transfer();
 
     // if SLAVE address was NACKed, abort
     if (VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) return stop_transfer();
@@ -89,10 +96,17 @@ bool i2c_read(const uint16_t addr, uint8_t addr_len, uint8_t *data, uint8_t data
                                  EUSCI_B_IFG_STTIFG | EUSCI_B_IFG_STPIFG);
 
     VL53L0X_EUSCI_SEL->CTLW0 &= ~UCTR;   /* Configure as receiver */
-    VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTT; /* Send START condition */
+    VL53L0X_EUSCI_SEL->CTLW0 |= UCTXSTT; /* Send second START condition */
 
-    // Wait for the address to be acknowledged (similar to start_transfer)
-    __delay_us(50);
+    // Wait for the start condition to be sent
+    if (!WAIT_UNTIL(!(VL53L0X_EUSCI_SEL->CTLW0 & UCTXSTT), TIMEOUT))
+        return stop_transfer();
+
+    // Wait for address to be copied to the shift register
+    if (!WAIT_UNTIL((VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_TXIFG0), TIMEOUT))
+        return stop_transfer();
+
+    // if SLAVE address was NACKed, abort
     if (VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) return stop_transfer();
 
     for(uint16_t i = 0; i < data_len; ++i)
@@ -116,10 +130,6 @@ bool i2c_read(const uint16_t addr, uint8_t addr_len, uint8_t *data, uint8_t data
 bool i2c_write(const uint16_t addr, uint8_t addr_len, const uint8_t *data, uint8_t data_len)
 {
     if (!start_transfer(addr, addr_len)) return false; // start the transfer for adressing a slave's register
-    
-    // Wait for the address to be acknowledged (similar to start_transfer)
-    __delay_us(50);
-    if (VL53L0X_EUSCI_SEL->IFG & EUSCI_B_IFG_NACKIFG) return stop_transfer();
 
     for (uint16_t i = 0; i < data_len; ++i)
     {
