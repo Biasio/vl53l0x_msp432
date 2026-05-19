@@ -34,6 +34,7 @@ static inline void __delay_us(uint32_t us)
 
 //MACRO to wait for a condition and set a temporal limit if this 
 //condition wouldn't occour. The condition, when true, let escape the while
+//returns true if the condition was met first, false if timeout occurred first
 #define WAIT_UNTIL(condition, timeout_us)   \
 ({                                          \
         uint32_t _cnt = (timeout_us);       \
