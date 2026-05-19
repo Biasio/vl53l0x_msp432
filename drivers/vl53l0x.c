@@ -17,6 +17,7 @@ void interrupt_gpio_init(void){
     #endif
     
     PORT(VL53L0X_INT_PORT)->IFG  &= ~ONE_HOT_BIT(VL53L0X_INT_PIN);
+    PORT(VL53L0X_INT_PORT)->IE  |= ONE_HOT_BIT(VL53L0X_INT_PIN);
     NVIC_ENABLE_PORT_INT(VL53L0X_INT_PORT);
 }
 
