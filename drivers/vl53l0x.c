@@ -717,18 +717,8 @@ static bool perform_ref_calibration()
 }
 
 
-/* Sets the address of the VL53L0X sensor */
-static bool init_address()
-{
-    xshut_toggle(true);
-    i2c_set_slave_address(VL53L0X_DEFAULT_ADDRESS);
-    return WAIT_UNTIL(device_is_booted(), 25000);
-}
-
-
 static bool init_config()
 {
-    i2c_set_slave_address(VL53L0X_DEFAULT_ADDRESS);
     if (!data_init()) {
         return false;
     }
@@ -752,10 +742,13 @@ void xshut_gpio_init(void)
 }
 
 
-void xshut_toggle(bool state)
+bool xshut_toggle(bool state)
 {
     if(state) PORT(XSHUT_PORT)->OUT |= ONE_HOT_BIT(XSHUT_PIN); //ON
     else PORT(XSHUT_PORT)->OUT &= ~ONE_HOT_BIT(XSHUT_PIN); //OFF
+
+    if(WAIT_UNTIL(device_is_booted(), 25000)) return true;
+    else return false;
 }
 
 
@@ -763,10 +756,12 @@ bool vl53l0x_init()
 {
     xshut_gpio_init();
     __delay_us(1000); // small delay for power stabilization
-    xshut_toggle(true);
-    __delay_us(25000); // wait for boot
-    if (!init_address()) return false;
-    if (!init_config()) return false;
+    
+    i2c_set_slave_address(VL53L0X_DEFAULT_ADDRESS);
+    
+    if(!xshut_toggle(true)) return false; //check if device is booted after toggling XSHUT pin
+
+    if (!init_config()) return false; //init config and perform reference calibration
     return true;
 }
 

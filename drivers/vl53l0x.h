@@ -36,7 +36,7 @@ void xshut_gpio_init(void);
 /* Helper function for setting XSHOUT->OUT register 
 High (state=true) or 
 Low (state=false) */
-void xshut_toggle(bool state);
+bool xshut_toggle(bool state);
 
 /* Handles the complex I2C initialization and internal calibration sequence required to prepare the sensor for use. It must be called every time the sensor is powered on or wakes up from an XSHUT reset */
 bool vl53l0x_init();
