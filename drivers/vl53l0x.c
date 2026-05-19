@@ -933,6 +933,10 @@ static bool static_init()
         return false;
     }
 
+    // Set signal rate limit to 0.25 MCPS
+    uint16_t limit = (uint16_t)(0.25 * (1 << 7));
+    i2c_write(REG_FINAL_RANGE_CONFIG_MIN_COUNT_RATE_RTN_LIMIT, 1, (uint8_t[]){limit >> 8, limit & 0xFF}, 2);
+
     if (!configure_interrupt(0x00)) {
         return false;
     }
@@ -1032,6 +1036,60 @@ static bool init_config()
 
 
 
+// Sets the VL53L0X GPIO interrupt to fire in "level low" mode, meaning the INT pin asserts whenever the measured distance fall out of the threshold window.
+static bool configure_LowThresh_interrupt(void)
+{
+    if(!device_is_booted()) return false; //check if device is booted
+
+    if (!configure_interrupt(0x01)) {
+        return false;
+    }
+
+    //Write the low threshold. The register is 16-bit big-endian
+    uint8_t low_thresh_bytes[2] = {
+        (uint8_t)(VL53L0X_LOW_THRESH >> 8),    // MSB
+        (uint8_t)(VL53L0X_LOW_THRESH & 0xFF)   // LSB
+    };
+    if (!i2c_write(REG_SYSTEM_THRESH_LOW, 1, low_thresh_bytes, 2)) {
+        return false;
+    }
+
+    // Write the high threshold
+    uint8_t high_thresh_bytes[2] = {
+        (uint8_t)(VL53L0X_HIGH_THRESH >> 8),
+        (uint8_t)(VL53L0X_HIGH_THRESH & 0xFF)
+    };
+    if (!i2c_write(REG_SYSTEM_THRESH_HIGH, 1, high_thresh_bytes, 2)) {
+        return false;
+    }
+
+    //Configure the INT pin polarity to active LOW.
+    uint8_t gpio_hv = 0;
+    if (!i2c_read(REG_GPIO_HV_MUX_ACTIVE_HIGH, 1, &gpio_hv, 1)) {
+        return false;
+    }
+    #if VL53L0X_INT_POLARITY == 0
+        gpio_hv &= ~(0x10);
+    #else
+        gpio_hv |= (0x10);
+    #endif
+    
+    if (!i2c_write(REG_GPIO_HV_MUX_ACTIVE_HIGH, 1,
+                        (uint8_t[]){gpio_hv}, 1)) {
+        return false;
+    }
+
+    // Clear any interrupt that may already be pending on the sensor.
+    if (!i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1,
+                        (uint8_t[]){0x01}, 1)) {
+        return false;
+    }
+
+    return true;
+}
+
+
+
 void xshut_gpio_init(void)
 {
     //GPIO mode
@@ -1063,7 +1121,12 @@ bool vl53l0x_init()
     if(!xshut_toggle(true)) return false; //check if device is booted after toggling XSHUT pin
 
     if (!init_config()) return false; //init config and perform reference calibration
+
+    // Configure the threshold-based interrupt before starting ranging
+    if (!configure_LowThresh_interrupt()) return false;
+
     return true;
+
 }
 
 bool vl53l0x_read_range_single(uint16_t *range)
@@ -1177,59 +1240,6 @@ bool vl53l0x_read_range_single(uint16_t *range)
 }
 
 
-// Sets the VL53L0X GPIO interrupt to fire in "level low" mode, meaning the INT pin asserts whenever the measured distance fall out of the threshold window.
-static bool configure_LowThresh_interrupt(void)
-{
-    if(!device_is_booted()) return false; //check if device is booted
-
-    if (!configure_interrupt(0x01)) {
-        return false;
-    }
-
-    //Write the low threshold. The register is 16-bit big-endian
-    uint8_t low_thresh_bytes[2] = {
-        (uint8_t)(VL53L0X_LOW_THRESH >> 8),    // MSB
-        (uint8_t)(VL53L0X_LOW_THRESH & 0xFF)   // LSB
-    };
-    if (!i2c_write(REG_SYSTEM_THRESH_LOW, 1, low_thresh_bytes, 2)) {
-        return false;
-    }
-
-    // Write the high threshold
-    uint8_t high_thresh_bytes[2] = {
-        (uint8_t)(VL53L0X_HIGH_THRESH >> 8),
-        (uint8_t)(VL53L0X_HIGH_THRESH & 0xFF)
-    };
-    if (!i2c_write(REG_SYSTEM_THRESH_HIGH, 1, high_thresh_bytes, 2)) {
-        return false;
-    }
-
-    //Configure the INT pin polarity to active LOW.
-    uint8_t gpio_hv = 0;
-    if (!i2c_read(REG_GPIO_HV_MUX_ACTIVE_HIGH, 1, &gpio_hv, 1)) {
-        return false;
-    }
-    #if VL53L0X_INT_POLARITY == 0
-        gpio_hv &= ~(0x10);
-    #else
-        gpio_hv |= (0x10);
-    #endif
-    
-    if (!i2c_write(REG_GPIO_HV_MUX_ACTIVE_HIGH, 1,
-                        (uint8_t[]){gpio_hv}, 1)) {
-        return false;
-    }
-
-    // Clear any interrupt that may already be pending on the sensor.
-    if (!i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1,
-                        (uint8_t[]){0x01}, 1)) {
-        return false;
-    }
-
-    return true;
-}
-
-
 
 bool vl53l0x_start_continuous(void)
 {
@@ -1281,6 +1291,9 @@ bool vl53l0x_start_continuous(void)
     if (!configure_LowThresh_interrupt()) {
         return false;
     }*/
+
+    
+
     // Ensure the sensor is idle
     if (!i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x01}, 1)) {
         return false;
