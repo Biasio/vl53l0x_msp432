@@ -127,8 +127,11 @@ static bool read_strobe()
         return false;
     }
 
-    if (!I2C_POLL_UNTIL(REG_NVM_READ_STROBE, &strobe, (strobe == 0), TIMEOUT_POLL)) return false;
-
+    if (!I2C_POLL_UNTIL(REG_NVM_READ_STROBE, &strobe, 
+            (strobe == 0), TIMEOUT_POLL))
+    {
+        return false;
+    }
     if (!i2c_write(
             REG_NVM_READ_STROBE, 1, 
             (uint8_t[]){0x01}, 1)) 
@@ -153,55 +156,82 @@ static bool read_strobe()
  */
 static bool get_spad_info_from_nvm(uint8_t *spad_count, uint8_t *spad_type, uint8_t good_spad_map[6])
 {
-    bool success = true;
     uint8_t tmp_data8 = 0;
     uint32_t tmp_data32 = 0;
     uint8_t buf[4] = {0};
 
     /* Setup to read from NVM */
-    success &= i2c_write(
+    if (!i2c_write(
         REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
-        (uint8_t[]){0x01}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x01}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_SYSRANGE_START, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x06}, 1);
-    success &= i2c_read(
+        (uint8_t[]){0x06}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_read(
         REG_NVM_READ_STROBE, 1, 
-        &tmp_data8, 1);
-    success &= i2c_write(
+        &tmp_data8, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_NVM_READ_STROBE, 1, 
-        (uint8_t[]){tmp_data8 | 0x04}, 1);
-    success &= i2c_write(
+        (uint8_t[]){tmp_data8 | 0x04}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x07}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x07}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_SYSTEM_HISTOGRAM_BIN, 1, 
-        (uint8_t[]){0x01}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
-        (uint8_t[]){0x01}, 1);
-    if (!success) return false;
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
 
     /* Get the SPAD count and type */
-    success &= i2c_write(
+    if (!i2c_write(
         REG_NVM_ADDR, 1, 
-        (uint8_t[]){0x6b}, 1);
-
-    if (!success) return false;
+        (uint8_t[]){0x6b}, 1)) 
+    {
+        return false;
+    }
     
     if (!read_strobe()) return false;
     
-    success &= i2c_read(
+    if (!i2c_read(
         REG_NVM_READ_DATA, 1, 
-        buf, 4);
-
-    if (!success) return false;
+        buf, 4)) 
+    {
+        return false;
+    }
 
     tmp_data32 = ((uint32_t)buf[0] << 24) | ((uint32_t)buf[1] << 16) | ((uint32_t)buf[2] << 8) | buf[3];
 
@@ -210,30 +240,54 @@ static bool get_spad_info_from_nvm(uint8_t *spad_count, uint8_t *spad_type, uint
 
 
     /* Restore after reading from NVM */
-    success &=i2c_write(
+    if (!i2c_write(
         REG_SYSTEM_HISTOGRAM_BIN, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &=i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x06}, 1);
-    success &=i2c_read(
+        (uint8_t[]){0x06}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_read(
         REG_NVM_READ_STROBE, 1, 
-        &tmp_data8, 1);
-    success &=i2c_write(
+        &tmp_data8, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_NVM_READ_STROBE, 1, 
-        (uint8_t[]){tmp_data8 & 0xfb}, 1);
-    success &=i2c_write(
+        (uint8_t[]){tmp_data8 & 0xfb}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x01}, 1);
-    success &=i2c_write(
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_SYSRANGE_START, 1, 
-        (uint8_t[]){0x01}, 1);
-    success &=i2c_write(
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &=i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
-        (uint8_t[]){0x00}, 1);
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
 
     /* When we haven't configured the SPAD map yet, the SPAD map register actually
      * contains the good SPAD map, so we can retrieve it straight from this register
@@ -243,7 +297,7 @@ static bool get_spad_info_from_nvm(uint8_t *spad_count, uint8_t *spad_type, uint
             good_spad_map, 6)) {
         return false;
     }
-    return success;
+    return true;
 }
 
 /**
@@ -268,23 +322,34 @@ static bool set_spads_from_nvm()
         total_val += good_spad_map[i];
     }
 
-    bool success = i2c_write(
+    if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x01}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_DYNAMIC_SPAD_REF_EN_START_OFFSET, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_DYNAMIC_SPAD_NUM_REQUESTED_REF_SPAD, 1, 
-        (uint8_t[]){0x2C}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x2C}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_GLOBAL_CONFIG_REF_EN_START_SELECT, 1, 
-        (uint8_t[]){SPAD_START_SELECT}, 1);
-    
-    if (!success) {
+        (uint8_t[]){SPAD_START_SELECT}, 1)) 
+    {
         return false;
     }
 
@@ -336,244 +401,481 @@ Load tuning settings (same as default tuning settings provided by Pololu library
 */
 static bool load_default_tuning_settings()
 {
-    bool success = i2c_write(
+    if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x01}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_SYSRANGE_START, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_SYSTEM_RANGE_CONFIG, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         0x10, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_SYSTEM_GROUPED_PARAM_HOLD, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         0x24, 1, 
-        (uint8_t[]){0x01}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         0x25, 1, 
-        (uint8_t[]){0xFF}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0xFF}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_OSC_CALIBRATE_VAL, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x01}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_DYNAMIC_SPAD_NUM_REQUESTED_REF_SPAD, 1, 
-        (uint8_t[]){0x2C}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x2C}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_FINAL_RANGE_CONFIG_VALID_PHASE_HIGH, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_ALGO_PHASECAL_CONFIG_TIMEOUT, 1, 
-        (uint8_t[]){0x20}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x20}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_ALGO_PHASECAL_CONFIG_TIMEOUT, 1, 
-        (uint8_t[]){0x09}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x09}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_HISTOGRAM_CONFIG_READOUT_CTRL, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_ALGO_PHASECAL_CONFIG, 1, 
-        (uint8_t[]){0x04}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x04}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_GLOBAL_CONFIG_VCSEL_WIDTH, 1, 
-        (uint8_t[]){0x03}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x03}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_UNKNOWN_0x40, 1, 
-        (uint8_t[]){0x83}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x83}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_MSRC_CONFIG_TIMEOUT_MACROP, 1, 
-        (uint8_t[]){0x25}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x25}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_MSRC_CONFIG_CONTROL, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_PRE_RANGE_CONFIG_MIN_SNR, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_PRE_RANGE_CONFIG_VCSEL_PERIOD, 1, 
-        (uint8_t[]){0x06}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x06}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_PRE_RANGE_CONFIG_TIMEOUT_MACROP_HI, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_PRE_RANGE_CONFIG_TIMEOUT_MACROP_LO, 1, 
-        (uint8_t[]){0x96}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x96}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_PRE_RANGE_CONFIG_VALID_PHASE_LOW, 1, 
-        (uint8_t[]){0x08}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x08}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_PRE_RANGE_CONFIG_VALID_PHASE_HIGH, 1, 
-        (uint8_t[]){0x30}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x30}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_PRE_RANGE_CONFIG_SIGMA_THRESH_HI, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_PRE_RANGE_CONFIG_SIGMA_THRESH_LO, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_PRE_RANGE_MIN_COUNT_RATE_RTN_LIMIT, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_UNKNOWN_0x65, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_UNKNOWN_0x66, 1, 
-        (uint8_t[]){0xA0}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0xA0}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x01}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_VHV_CONFIG_TIMEOUT_MACROP, 1, 
-        (uint8_t[]){0x32}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x32}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_FINAL_RANGE_CONFIG_VALID_PHASE_LOW, 1, 
-        (uint8_t[]){0x14}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x14}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_UNKNOWN_0x49, 1, 
-        (uint8_t[]){0xFF}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0xFF}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_UNKNOWN_0x4A, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_RESULT_CORE_AMBIENT_WINDOW_EVENTS_RTN, 1, 
-        (uint8_t[]){0x0A}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x0A}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_RESULT_CORE_RANGING_TOTAL_EVENTS_RTN, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_RESULT_PEAK_SIGNAL_RATE_REF, 1, 
-        (uint8_t[]){0x21}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x21}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x01}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_VHV_CONFIG_LOOPBOUND, 1, 
-        (uint8_t[]){0x34}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x34}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_UNKNOWN_0x42, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_FINAL_RANGE_CONFIG_MIN_COUNT_RATE_RTN_LIMIT, 1, 
-        (uint8_t[]){0xFF}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0xFF}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_UNKNOWN_0x45, 1, 
-        (uint8_t[]){0x26}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x26}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_MSRC_CONFIG_TIMEOUT_MACROP, 1, 
-        (uint8_t[]){0x05}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x05}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_UNKNOWN_0x40, 1, 
-        (uint8_t[]){0x40}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x40}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_SYSTEM_THRESH_LOW, 1, 
-        (uint8_t[]){0x06}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x06}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_CROSSTALK_COMPENSATION_PEAK_RATE_MCPS, 1, 
-        (uint8_t[]){0x1A}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x1A}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_UNKNOWN_0x43, 1, 
-        (uint8_t[]){0x40}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x40}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_ALGO_PHASECAL_CONFIG_START, 1, 
-        (uint8_t[]){0x03}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x03}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_ALGO_PHASECAL_CONFIG_END, 1, 
-        (uint8_t[]){0x44}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x44}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x01}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_ALGO_PHASECAL_CONFIG, 1, 
-        (uint8_t[]){0x04}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x04}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_UNKNOWN_0x4B, 1, 
-        (uint8_t[]){0x09}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x09}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_UNKNOWN_0x4C, 1, 
-        (uint8_t[]){0x05}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x05}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_UNKNOWN_0x4D, 1, 
-        (uint8_t[]){0x04}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x04}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_FINAL_RANGE_CONFIG_MIN_COUNT_RATE_RTN_LIMIT, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_UNKNOWN_0x45, 1, 
-        (uint8_t[]){0x20}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x20}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_FINAL_RANGE_CONFIG_VALID_PHASE_LOW, 1, 
-        (uint8_t[]){0x08}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x08}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_FINAL_RANGE_CONFIG_VALID_PHASE_HIGH, 1, 
-        (uint8_t[]){0x28}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x28}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_FINAL_RANGE_CONFIG_MIN_SNR, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_FINAL_RANGE_CONFIG_VCSEL_PERIOD, 1, 
-        (uint8_t[]){0x04}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x04}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_FINAL_RANGE_CONFIG_TIMEOUT_MACROP_HI, 1, 
-        (uint8_t[]){0x01}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_FINAL_RANGE_CONFIG_TIMEOUT_MACROP_LO, 1, 
-        (uint8_t[]){0xFE}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0xFE}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_RESULT_CORE_AMBIENT_WINDOW_EVENTS_REF, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_RESULT_CORE_RANGING_TOTAL_EVENTS_REF, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x01}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         0x0D, 1, 
-        (uint8_t[]){0x01}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
-        (uint8_t[]){0x01}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x01}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_PAGE_REG, 1, 
-        (uint8_t[]){0x01}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_SYSRANGE_START, 1, 
-        (uint8_t[]){0x01}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
-        (uint8_t[]){0x00}, 1);
-    return success;
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    return true;
 }
 
 static bool configure_interrupt(uint8_t mode)
@@ -672,7 +974,11 @@ static bool perform_single_ref_calibration(calibration_type_t calib_type)
     /* Wait for interrupt */
     uint8_t interrupt_status = 0;
 
-    if (!I2C_POLL_UNTIL(REG_RESULT_INTERRUPT_STATUS, &interrupt_status, ((interrupt_status & 0x07) == 0), TIMEOUT_POLL)) return false;
+    if(!I2C_POLL_UNTIL(REG_RESULT_INTERRUPT_STATUS, &interrupt_status, 
+            ((interrupt_status & 0x07) == 0), TIMEOUT_POLL)) 
+    {
+        return false;
+    }
 
     if (!i2c_write(
             REG_SYSTEM_INTERRUPT_CLEAR, 1, 
@@ -765,28 +1071,46 @@ bool vl53l0x_read_range_single(uint16_t *range)
     if(!xshut_toggle(true)) return false; //check if device is booted after toggling XSHUT pin
 
     i2c_set_slave_address(VL53L0X_DEFAULT_ADDRESS);
-    bool success = i2c_write(
+    if (!i2c_write(
         REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
-        (uint8_t[]){0x01}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x01}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_SYSRANGE_START, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_1, 1, 
-        (uint8_t[]){stop_variable}, 1);
-    success &= i2c_write(
+        (uint8_t[]){stop_variable}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_SYSRANGE_START, 1, 
-        (uint8_t[]){0x01}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
-        (uint8_t[]){0x00}, 1);
-    if (!success) {
+        (uint8_t[]){0x00}, 1)) 
+    {
         return false;
     }
 
@@ -798,22 +1122,23 @@ bool vl53l0x_read_range_single(uint16_t *range)
 
     uint8_t sysrange_start = 0;
 
-    success = I2C_POLL_UNTIL(REG_SYSRANGE_START, &sysrange_start, (sysrange_start & 0x01), TIMEOUT_POLL);
-
-    if (!success) {
+    if (!I2C_POLL_UNTIL(REG_SYSRANGE_START, &sysrange_start, 
+            (sysrange_start & 0x01), TIMEOUT_POLL)) 
+    {
         return false;
     }
 
     uint8_t interrupt_status = 0;
+    bool success = false;
     do {
         success = i2c_read(
             REG_RESULT_INTERRUPT_STATUS, 1, 
             &interrupt_status, 1);
     } while (success && ((interrupt_status & 0x07) == 0));
 
-    success = I2C_POLL_UNTIL(REG_RESULT_INTERRUPT_STATUS, &interrupt_status, ((interrupt_status & 0x07) == 0), TIMEOUT_POLL);
-
-    if (!success) {
+    if (!I2C_POLL_UNTIL(REG_RESULT_INTERRUPT_STATUS, &interrupt_status, 
+            ((interrupt_status & 0x07) == 0), TIMEOUT_POLL)) 
+    {
         return false;
     }
 
@@ -910,28 +1235,46 @@ bool vl53l0x_start_continuous(void)
 {
     if(!xshut_toggle(true)) return false; //check if device is booted after toggling XSHUT pin
 
-    bool success = i2c_write(
+    if (!i2c_write(
         REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
-        (uint8_t[]){0x01}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x01}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_SYSRANGE_START, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_1, 1, 
-        (uint8_t[]){stop_variable}, 1);
-    success &= i2c_write(
+        (uint8_t[]){stop_variable}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_SYSRANGE_START, 1, 
-        (uint8_t[]){0x01}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x01}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
-        (uint8_t[]){0x00}, 1);
-    success &= i2c_write(
+        (uint8_t[]){0x00}, 1)) 
+    {
+        return false;
+    }
+    if (!i2c_write(
         REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
-        (uint8_t[]){0x00}, 1);
-    if (!success) {
+        (uint8_t[]){0x00}, 1)) 
+    {
         return false;
     }
     // Configure the threshold-based interrupt before starting ranging
@@ -957,17 +1300,40 @@ bool vl53l0x_stop_continuous(void)
 {
     if(!xshut_toggle(true)) return false; //check if device is booted after toggling XSHUT pin
 
-    bool status = i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x01}, 1);
+    if (!i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x01}, 1))
+    {
+        return false;
+    }
+    if (!i2c_write(REG_POWER_MANAGEMENT_GO1_POWER_FORCE, 1, (uint8_t[]){0x01}, 1))
+    {
+        return false;
+    }
+    if (!i2c_write(REG_INTERNAL_TUNING_2, 1, (uint8_t[]){0x01}, 1))
+    {
+        return false;
+    }
+    if (!i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x00}, 1))
+    {
+        return false;
+    }
+    if (!i2c_write(REG_INTERNAL_TUNING_1, 1, (uint8_t[]){0x00}, 1))
+    {
+        return false;
+    }
+    if (!i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x01}, 1))
+    {
+        return false;
+    }
+    if (!i2c_write(REG_INTERNAL_TUNING_2, 1, (uint8_t[]){0x00}, 1))
+    {
+        return false;
+    }
+    if (!i2c_write(REG_POWER_MANAGEMENT_GO1_POWER_FORCE, 1, (uint8_t[]){0x00}, 1))
+    {
+        return false;
+    }
 
-    status &= i2c_write(REG_POWER_MANAGEMENT_GO1_POWER_FORCE, 1, (uint8_t[]){0x01}, 1);
-    status &= i2c_write(REG_INTERNAL_TUNING_2, 1, (uint8_t[]){0x01}, 1);
-    status &= i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x00}, 1);
-    status &= i2c_write(REG_INTERNAL_TUNING_1, 1, (uint8_t[]){0x00}, 1);
-    status &= i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x01}, 1);
-    status &= i2c_write(REG_INTERNAL_TUNING_2, 1, (uint8_t[]){0x00}, 1);
-    status &= i2c_write(REG_POWER_MANAGEMENT_GO1_POWER_FORCE, 1, (uint8_t[]){0x00}, 1);
-
-    return status;
+    return true;
 }
 
 
@@ -1005,4 +1371,3 @@ bool vl53l0x_read_range_interrupt(uint16_t *range)
     return i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1,
                           (uint8_t[]){0x01}, 1);
 }
-
