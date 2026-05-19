@@ -12,7 +12,8 @@
 // Glue macros (no expansion of the macros passed as arguments)
 #define GLUE2(a, b)       a ## b
 
-#define NVIC_ENABLE_PORT_INT(port) (NVIC->ISER[((port) + 34) / 32] = (1UL << (((port) + 34) & 0x1F)))
+#define NVIC_ENABLE_PORT_INT(port) \
+  (NVIC->ISER[((port) + 19) / 32] |= (1UL << (((port) + 19) & 0x1F)))
 
 #ifndef MCLK_HZ //used for the delay function
     #define MCLK_HZ (48000000UL)    /* 48 MHz default */

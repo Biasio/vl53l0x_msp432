@@ -1367,7 +1367,7 @@ bool vl53l0x_read_range_interrupt(uint16_t *range)
         return false;
 
     // Check lower 3 bits
-    if ((status_byte & 0x78) != 0x58) {
+    if ((status_byte & 0xF8) != 0x58) {
         i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x01}, 1);
         return false;
     }
