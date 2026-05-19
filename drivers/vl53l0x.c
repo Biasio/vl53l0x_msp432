@@ -735,8 +735,11 @@ static bool init_config()
 
 void xshut_gpio_init(void)
 {
+    //GPIO mode
     PORT(XSHUT_PORT)->SEL0 &= ~ONE_HOT_BIT(XSHUT_PIN); //0
     PORT(XSHUT_PORT)->SEL1 &= ~ONE_HOT_BIT(XSHUT_PIN); //0
+    
+    //output and low to keep the device in standby
     PORT(XSHUT_PORT)->DIR |= ONE_HOT_BIT(XSHUT_PIN);
     PORT(XSHUT_PORT)->OUT &= ~ONE_HOT_BIT(XSHUT_PIN);
 }
