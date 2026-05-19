@@ -1042,7 +1042,9 @@ static bool configure_LowThresh_interrupt(void)
 {
     if(!device_is_booted()) return false; //check if device is booted
 
-    if (!configure_interrupt(0x01)) {
+    // Disable interrupt first (set mode to off)
+    if (!i2c_write(REG_SYSTEM_INTERRUPT_CONFIG_GPIO, 1, 
+                   (uint8_t[]){0x00}, 1)) {
         return false;
     }
 
@@ -1077,6 +1079,12 @@ static bool configure_LowThresh_interrupt(void)
     
     if (!i2c_write(REG_GPIO_HV_MUX_ACTIVE_HIGH, 1,
                         (uint8_t[]){gpio_hv}, 1)) {
+        return false;
+    }
+
+    // Enable mode 0x01 (below LOW threshold)
+    if (!i2c_write(REG_SYSTEM_INTERRUPT_CONFIG_GPIO, 1, 
+                   (uint8_t[]){0x01}, 1)) {
         return false;
     }
 
