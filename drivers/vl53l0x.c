@@ -960,7 +960,11 @@ static bool perform_single_ref_calibration(calibration_type_t calib_type)
         return false;
     }
 
-    if (!clear_interrupt()) return false;
+    if (!i2c_write(
+            REG_SYSTEM_INTERRUPT_CLEAR, 1, 
+            (uint8_t[]){0x01}, 1)) {
+        return false;
+    }
 
     if (!i2c_write(
             REG_SYSRANGE_START, 1, 
