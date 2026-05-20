@@ -22,14 +22,14 @@
         Generally this is ok since it's the fastest available frequency"
 #endif
 
+
+#define MAX_US (((UINT32_MAX) * 2000000ULL) / (MCLK_HZ))
+
 static void __delay_us(uint64_t us)
 {
-    static const uint32_t max_us = (UINT32_MAX * 2000000ULL) / MCLK_HZ;
-    static const uint32_t max_iter = (MCLK_HZ * (uint64_t)max_us) / 2000000ULL;
-    
     // Delay full chunks of max_us
-    while (us > max_us) {
-        uint32_t iterations = max_iter;
+    while (us >= MAX_US) {
+        uint32_t iterations = UINT32_MAX;
         __asm__ volatile (
             "1: subs %0, #1\n"
             "   bne 1b\n"
@@ -37,13 +37,13 @@ static void __delay_us(uint64_t us)
             :
             : "cc"
         );
-        us -= max_us;
+        us -= MAX_US;
     }
-    
-    // Delay the remaining microseconds (us < max_us)
+
+    // Delay the remaining microseconds (us < MAX_US)
     if (us > 0) {
-        uint32_t iterations = (MCLK_HZ * us) / 2000000ULL;
-        if (iterations == 0) iterations = 1;
+        uint32_t iterations = ( (MCLK_HZ) * (uint64_t) us )/2000000ULL;
+        if (iterations == 0) iterations = 1; // triggered if MCLK_HZ < 2MHz
         __asm__ volatile (
             "1: subs %0, #1\n"
             "   bne 1b\n"
