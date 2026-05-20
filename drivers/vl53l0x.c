@@ -1257,7 +1257,7 @@ bool vl53l0x_read_range_single(uint16_t *range)
         goto CLEANUP;
     }
     if ((range_status & 0x78) != 0x58) {
-        clear_interrupt()
+        clear_interrupt();
         goto CLEANUP;
     }
 
