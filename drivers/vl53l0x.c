@@ -1096,7 +1096,7 @@ static bool configure_LowThresh_interrupt(void)
 
     // Enable mode 0x01 (below LOW threshold)
     if (!i2c_write(REG_SYSTEM_INTERRUPT_CONFIG_GPIO, 1, 
-                   (uint8_t[]){0x01}, 1)) {
+                   (uint8_t[]){0x03}, 1)) {
         return false;
     }
 
