@@ -2,25 +2,6 @@
 
 static uint8_t stop_variable = 0;
 
-void interrupt_gpio_init(void){
-    PORT(VL53L0X_INT_PORT)->SEL0 &= ~ONE_HOT_BIT(VL53L0X_INT_PIN);  
-    PORT(VL53L0X_INT_PORT)->SEL1 &= ~ONE_HOT_BIT(VL53L0X_INT_PIN);
-    PORT(VL53L0X_INT_PORT)->DIR  &= ~ONE_HOT_BIT(VL53L0X_INT_PIN);
-    PORT(VL53L0X_INT_PORT)->REN  |=  ONE_HOT_BIT(VL53L0X_INT_PIN);
-    
-    #if VL53L0X_INT_POLARITY == 0
-        PORT(VL53L0X_INT_PORT)->OUT  |=  ONE_HOT_BIT(VL53L0X_INT_PIN);
-        PORT(VL53L0X_INT_PORT)->IES  |=  ONE_HOT_BIT(VL53L0X_INT_PIN);
-    #elif VL53L0X_INT_POLARITY == 1
-        PORT(VL53L0X_INT_PORT)->OUT  &=  ~ONE_HOT_BIT(VL53L0X_INT_PIN);
-        PORT(VL53L0X_INT_PORT)->IES  &=  ~ONE_HOT_BIT(VL53L0X_INT_PIN);
-    #endif
-    
-    PORT(VL53L0X_INT_PORT)->IFG  &= ~ONE_HOT_BIT(VL53L0X_INT_PIN);
-    PORT(VL53L0X_INT_PORT)->IE  |= ONE_HOT_BIT(VL53L0X_INT_PIN);
-    NVIC_ENABLE_PORT_INT(VL53L0X_INT_PORT);
-}
-
 /* Check if the sensor is booted by reading the model id 
 (There is no fresh_out_of_reset as on the vl6180x) */
 static bool device_is_booted()
@@ -881,14 +862,14 @@ static bool load_default_tuning_settings()
 
 static bool configure_interrupt(uint8_t mode)
 {
-    /* Interrupt on new sample ready */
+    /* Interrupt mode */
     if (!i2c_write(
             REG_SYSTEM_INTERRUPT_CONFIG_GPIO, 1, 
             (uint8_t[]){mode}, 1)) {
         return false;
     }
 
-    /* Configure active low since the pin is pulled-up on most breakout boards */
+    /* Configure active low since the pin is pulled-up */
     uint8_t gpio_hv_mux_active_high = 0;
     if (!i2c_read(
             REG_GPIO_HV_MUX_ACTIVE_HIGH, 1, 
@@ -902,11 +883,8 @@ static bool configure_interrupt(uint8_t mode)
         return false;
     }
 
-    if (!i2c_write(
-            REG_SYSTEM_INTERRUPT_CLEAR, 1, 
-            (uint8_t[]){0x01}, 1)) {
-        return false;
-    }
+    if (!clear_interrupt()) return false;
+
     return true;
 }
 
@@ -985,11 +963,7 @@ static bool perform_single_ref_calibration(calibration_type_t calib_type)
         return false;
     }
 
-    if (!i2c_write(
-            REG_SYSTEM_INTERRUPT_CLEAR, 1, 
-            (uint8_t[]){0x01}, 1)) {
-        return false;
-    }
+    if (!clear_interrupt()) return false;
 
     if (!i2c_write(
             REG_SYSRANGE_START, 1, 
@@ -1036,23 +1010,22 @@ static bool init_config()
 }
 
 
-
 // Sets the VL53L0X GPIO interrupt to fire in "level low" mode, meaning the INT pin asserts whenever the measured distance fall out of the threshold window.
 static bool configure_LowThresh_interrupt(void)
 {
-    if(!device_is_booted()) return false; //check if device is booted
+    if(!device_is_booted()) goto CLEANUP; //check if device is booted
 
     // Disable interrupt first (set mode to off)
     if (!i2c_write(REG_SYSTEM_INTERRUPT_CONFIG_GPIO, 1, 
                    (uint8_t[]){0x00}, 1)) {
-        return false;
+        goto CLEANUP;
     }
 
     uint8_t interrupt_status = 0;
     if (!I2C_POLL_UNTIL(REG_RESULT_INTERRUPT_STATUS, &interrupt_status, 
             ((interrupt_status & 0x07) == 0), TIMEOUT_POLL))
     {
-        return false;
+        goto CLEANUP;
     }
 
     //The low threshold register is in units of 2mm, so we need to divide the threshold by 2 before writing it to the register. 
@@ -1065,7 +1038,7 @@ static bool configure_LowThresh_interrupt(void)
         (uint8_t)(fixed_thresh & 0xFF)   // LSB
     };
     if (!i2c_write(REG_SYSTEM_THRESH_LOW, 1, low_thresh_bytes, 2)) {
-        return false;
+        goto CLEANUP;
     }
 
     fixed_thresh = (VL53L0X_HIGH_THRESH>>1) & 0x0FFF; 
@@ -1075,13 +1048,13 @@ static bool configure_LowThresh_interrupt(void)
         (uint8_t)(fixed_thresh & 0xFF)
     };
     if (!i2c_write(REG_SYSTEM_THRESH_HIGH, 1, high_thresh_bytes, 2)) {
-        return false;
+        goto CLEANUP;
     }
 
     //Configure the INT pin polarity to active LOW.
     uint8_t gpio_hv = 0;
     if (!i2c_read(REG_GPIO_HV_MUX_ACTIVE_HIGH, 1, &gpio_hv, 1)) {
-        return false;
+        goto CLEANUP;
     }
     #if VL53L0X_INT_POLARITY == 0
         gpio_hv &= ~(0x10);
@@ -1091,24 +1064,52 @@ static bool configure_LowThresh_interrupt(void)
     
     if (!i2c_write(REG_GPIO_HV_MUX_ACTIVE_HIGH, 1,
                         (uint8_t[]){gpio_hv}, 1)) {
-        return false;
+        goto CLEANUP;
     }
 
     // Enable mode 0x01 (below LOW threshold)
     if (!i2c_write(REG_SYSTEM_INTERRUPT_CONFIG_GPIO, 1, 
-                   (uint8_t[]){0x03}, 1)) {
-        return false;
+                   (uint8_t[]){0x01}, 1)) {
+        goto CLEANUP;
     }
 
-    // Clear any interrupt that may already be pending on the sensor.
-    if (!i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1,
-                        (uint8_t[]){0x01}, 1)) {
-        return false;
+    uint8_t check;
+    if (!i2c_read(REG_SYSTEM_INTERRUPT_CONFIG_GPIO, 1, 
+                    &check, 1)) {
+        goto CLEANUP;
     }
 
-    return true;
+    if (check != 0x03) goto CLEANUP;
+
+    // Clear any interrupt that may already be pending on the sensor and return.
+    return clear_interrupt();
+
+
+    CLEANUP:
+        clear_interrupt();
+        return false;
 }
 
+
+
+void interrupt_gpio_init(void){
+    PORT(VL53L0X_INT_PORT)->SEL0 &= ~ONE_HOT_BIT(VL53L0X_INT_PIN);  
+    PORT(VL53L0X_INT_PORT)->SEL1 &= ~ONE_HOT_BIT(VL53L0X_INT_PIN);
+    PORT(VL53L0X_INT_PORT)->DIR  &= ~ONE_HOT_BIT(VL53L0X_INT_PIN);
+    PORT(VL53L0X_INT_PORT)->REN  |=  ONE_HOT_BIT(VL53L0X_INT_PIN);
+    
+    #if VL53L0X_INT_POLARITY == 0
+        PORT(VL53L0X_INT_PORT)->OUT  |=  ONE_HOT_BIT(VL53L0X_INT_PIN);
+        PORT(VL53L0X_INT_PORT)->IES  |=  ONE_HOT_BIT(VL53L0X_INT_PIN);
+    #elif VL53L0X_INT_POLARITY == 1
+        PORT(VL53L0X_INT_PORT)->OUT  &=  ~ONE_HOT_BIT(VL53L0X_INT_PIN);
+        PORT(VL53L0X_INT_PORT)->IES  &=  ~ONE_HOT_BIT(VL53L0X_INT_PIN);
+    #endif
+    
+    PORT(VL53L0X_INT_PORT)->IFG  &= ~ONE_HOT_BIT(VL53L0X_INT_PIN);
+    PORT(VL53L0X_INT_PORT)->IE  |= ONE_HOT_BIT(VL53L0X_INT_PIN);
+    NVIC_ENABLE_PORT_INT(VL53L0X_INT_PORT);
+}
 
 
 void xshut_gpio_init(void)
@@ -1144,64 +1145,76 @@ bool vl53l0x_init()
     if (!init_config()) return false; //init config and perform reference calibration
 
     // Configure the threshold-based interrupt before starting ranging
-    if (!configure_LowThresh_interrupt()) return false;
+    if (!configure_LowThresh_interrupt()) 
+    {
+        clear_interrupt(); 
+        return false;
+    }
 
     return true;
-
 }
+
+
+
+bool clear_interrupt(){
+    return i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x01}, 1);
+}
+
+
+
 
 bool vl53l0x_read_range_single(uint16_t *range)
 {
-    if(!device_is_booted()) return false; //check if device is booted
+    if(!device_is_booted()) goto CLEANUP; //check if device is booted
 
     i2c_set_slave_address(VL53L0X_DEFAULT_ADDRESS);
     if (!i2c_write(
         REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
         (uint8_t[]){0x01}, 1)) 
     {
-        return false;
+        goto CLEANUP;
     }
     if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x01}, 1)) 
     {
-        return false;
+        goto CLEANUP;
     }
     if (!i2c_write(
         REG_SYSRANGE_START, 1, 
         (uint8_t[]){0x00}, 1)) 
     {
-        return false;
+        goto CLEANUP;
     }
     if (!i2c_write(
         REG_INTERNAL_TUNING_1, 1, 
         (uint8_t[]){stop_variable}, 1)) 
     {
-        return false;
+        goto CLEANUP;
     }
     if (!i2c_write(
         REG_SYSRANGE_START, 1, 
         (uint8_t[]){0x01}, 1)) 
     {
-        return false;
+        goto CLEANUP;
     }
     if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x00}, 1)) 
     {
-        return false;
+        goto CLEANUP;
     }
     if (!i2c_write(
         REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
         (uint8_t[]){0x00}, 1)) 
     {
-        return false;
+        goto CLEANUP;
     }
 
     if (!i2c_write(
             REG_SYSRANGE_START, 1, 
             (uint8_t[]){0x01}, 1)) {
-        return false;
+        goto CLEANUP;
     }
 
     uint8_t sysrange_start = 0;
@@ -1209,7 +1222,7 @@ bool vl53l0x_read_range_single(uint16_t *range)
     if (!I2C_POLL_UNTIL(REG_SYSRANGE_START, &sysrange_start, 
             (sysrange_start & 0x01), TIMEOUT_POLL)) 
     {
-        return false;
+        goto CLEANUP;
     }
 
     uint8_t interrupt_status = 0;
@@ -1223,148 +1236,147 @@ bool vl53l0x_read_range_single(uint16_t *range)
     if (!I2C_POLL_UNTIL(REG_RESULT_INTERRUPT_STATUS, &interrupt_status, 
             ((interrupt_status & 0x07) == 0), TIMEOUT_POLL)) 
     {
-        return false;
+        goto CLEANUP;
     }
 
     uint8_t range_status = 0;
     if (!i2c_read(REG_RESULT_RANGE_STATUS, 1, &range_status, 1)) {
-        // clear interrupt before returning
-        i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x01}, 1);
-        return false;
+        clear_interrupt();
+        goto CLEANUP;
     }
     if ((range_status & 0x78) != 0x58) {
-        i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x01}, 1);
-        return false;
+        clear_interrupt()
+        goto CLEANUP;
     }
 
     uint8_t range_buf[2];
-    if (!i2c_read(
-            REG_RESULT_RANGE_STATUS + 10, 1, 
+    if (!i2c_read(REG_RESULT_RANGE_STATUS + 10, 1, 
             range_buf, 2)) {
-        i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x01}, 1);
-        return false;
+        clear_interrupt();
+        goto CLEANUP;
     }
     *range = ((uint16_t)range_buf[0] << 8) | range_buf[1];
-
-    if (!i2c_write(
-            REG_SYSTEM_INTERRUPT_CLEAR, 1, 
-            (uint8_t[]){0x01}, 1)) {
-        return false;
-    }
 
     /* 8190 or 8191 may be returned when obstacle is out of range. */
     if (*range == 8190 || *range == 8191) {
         *range = VL53L0X_OUT_OF_RANGE;
     }
 
-    return true;
+    return clear_interrupt();
+
+    CLEANUP:
+        clear_interrupt();
+        return false;
 }
 
 
 
 bool vl53l0x_start_continuous(void)
 {
-    if(!device_is_booted()) return false; //check if device is booted
+    if(!device_is_booted()) goto CLEANUP; //check if device is booted
 
     if (!i2c_write(
         REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
         (uint8_t[]){0x01}, 1)) 
     {
-        return false;
+        goto CLEANUP;
     }
     if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x01}, 1)) 
     {
-        return false;
+        goto CLEANUP;
     }
     if (!i2c_write(
         REG_SYSRANGE_START, 1, 
         (uint8_t[]){0x00}, 1)) 
     {
-        return false;
+        goto CLEANUP;
     }
     if (!i2c_write(
         REG_INTERNAL_TUNING_1, 1, 
         (uint8_t[]){stop_variable}, 1)) 
     {
-        return false;
+        goto CLEANUP;
     }
     if (!i2c_write(
         REG_SYSRANGE_START, 1, 
         (uint8_t[]){0x01}, 1)) 
     {
-        return false;
+        goto CLEANUP;
     }
     if (!i2c_write(
         REG_INTERNAL_TUNING_2, 1, 
         (uint8_t[]){0x00}, 1)) 
     {
-        return false;
+        goto CLEANUP;
     }
     if (!i2c_write(
         REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
         (uint8_t[]){0x00}, 1)) 
     {
-        return false;
+        goto CLEANUP;
     }
     
     uint8_t val=0x00;
-    if (!i2c_read(REG_SYSRANGE_START, 1, &val, 1)) return false;
-    if (val & 0x01){ //if it was in single mode, we need to stop it first before starting continuous mode
-        // Ensure the sensor is idle
-        if (!i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x01}, 1)) {
-            return false;
-        }
+    if (!i2c_read(REG_SYSRANGE_START, 1, &val, 1)) goto CLEANUP;
+    if (val & 0x01)
+    { //true if it was in single mode, we need to stop it first before starting continuous mode
+        // put the sesnor into idle
+        if (!i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x01}, 1)) goto CLEANUP;
         // Wait for stop to complete
         do {
-            if (!i2c_read(REG_SYSRANGE_START, 1, &val, 1)) return false;
+            if (!i2c_read(REG_SYSRANGE_START, 1, &val, 1)) goto CLEANUP;
         } while (val & 0x01);
     }   
+
+    //clear any pending interrupt
+    if (!clear_interrupt()) goto CLEANUP;
+
     // Start continuous ranging
     return i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x02}, 1);
+
+    CLEANUP:    
+        clear_interrupt(); 
+        return false;
 }
 
 
 bool vl53l0x_stop_continuous(void)
 {
-    if(!device_is_booted()) return false; //check if device is booted
+    if(!device_is_booted()) goto CLEANUP; //check if device is booted
 
-    if (!i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x01}, 1)) {
-        return false;
-    }
+    if (!i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x01}, 1)) goto CLEANUP;
     // Wait for stop to complete
     uint8_t val=0x00;
     do {
-        if (!i2c_read(REG_SYSRANGE_START, 1, &val, 1)) return false;
+        if (!i2c_read(REG_SYSRANGE_START, 1, &val, 1)) goto CLEANUP;
     } while (val & 0x01);
 
-    return true;
+    // clear pending interrupts
+    return clear_interrupt(); 
+
+    CLEANUP:    
+        clear_interrupt(); 
+        return false;
 }
 
 
 
 bool vl53l0x_read_range_interrupt(uint16_t *range)
 {
-    if(!device_is_booted()) return false; //check if device is booted
+    if(!device_is_booted()) goto CLEANUP; //check if device is booted
 
     // Read the status byte and validate before trusting the range result.
     uint8_t status_byte;
-    if (!i2c_read(REG_RESULT_RANGE_STATUS, 1, &status_byte, 1))
-        return false;
+    if (!i2c_read(REG_RESULT_RANGE_STATUS, 1, &status_byte, 1)) goto CLEANUP;
 
     // Check lower 3 bits
-    if ((status_byte & 0x78) != 0x58) {
-        i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x01}, 1);
-        return false;
-    }
+    if ((status_byte & 0x78) != 0x58) goto CLEANUP;
 
     // Measurement is valid. Read the 2-byte range result.
     uint8_t buf[2] = {0, 0};
-    if (!i2c_read(REG_RESULT_RANGE_STATUS + 0x0A, 1, buf, 2)) {
-        i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x01}, 1);
-        return false;
-    }
+    if (!i2c_read(REG_RESULT_RANGE_STATUS + 0x0A, 1, buf, 2)) goto CLEANUP;
     
     *range = ((uint16_t)buf[0] << 8) | buf[1];
 
@@ -1374,6 +1386,9 @@ bool vl53l0x_read_range_interrupt(uint16_t *range)
     }
 
     // Clear the interrupt last, after all reads are complete.
-    return i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1,
-                          (uint8_t[]){0x01}, 1);
+    return clear_interrupt();
+
+    CLEANUP:    
+        clear_interrupt(); 
+        return false;
 }
