@@ -1158,10 +1158,10 @@ bool clear_interrupt(){
     do {
         // Clear interrupts
         if(!i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x01}, 1)) return false;
-        if(!i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x00}, 1)) return false;
+        //if(!i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x00}, 1)) return false;
         // Read status to check if interrupts were cleared
         if (!i2c_read(REG_RESULT_INTERRUPT_STATUS, 1, &status, 1)) return false;
-        if (--timeout) return false;
+        if (!(--timeout)) return false;
     } while ((status & 0x07) != 0);
 
     return true;
