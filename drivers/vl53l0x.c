@@ -1151,7 +1151,7 @@ bool vl53l0x_init()
 
 bool clear_interrupt(){
     uint8_t status;
-    uint16_t timeout = 1000; // (loop iterations)
+    uint16_t timeout = 50; // (loop iterations)
 
     do {
         // Clear interrupts
@@ -1246,18 +1246,16 @@ bool vl53l0x_read_range_single(uint16_t *range)
 
     uint8_t range_status = 0;
     if (!i2c_read(REG_RESULT_RANGE_STATUS, 1, &range_status, 1)) {
-        clear_interrupt();
         goto CLEANUP;
     }
+
     if ((range_status & 0x78) != 0x58) {
-        clear_interrupt();
         goto CLEANUP;
     }
 
     uint8_t range_buf[2];
     if (!i2c_read(REG_RESULT_RANGE_STATUS + 10, 1, 
             range_buf, 2)) {
-        clear_interrupt();
         goto CLEANUP;
     }
     *range = ((uint16_t)range_buf[0] << 8) | range_buf[1];
@@ -1338,8 +1336,18 @@ bool vl53l0x_start_continuous(void)
     // Configure the threshold-based interrupt before starting ranging
     if (!configure_LowThresh_interrupt()) goto CLEANUP;
 
-    // Start continuous ranging
+    //restore stop variable
+    if (!i2c_write(
+            REG_INTERNAL_TUNING_1, 1, 
+            (uint8_t[]){stop_variable}, 1)) 
+    {
+        goto CLEANUP;
+    }
+    
+        // Start continuous ranging
     return i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x02}, 1);
+
+    
 
     CLEANUP:    
         clear_interrupt(); 
@@ -1357,6 +1365,9 @@ bool vl53l0x_stop_continuous(void)
     do {
         if (!i2c_read(REG_SYSRANGE_START, 1, &val, 1)) goto CLEANUP;
     } while (val & 0x01);
+
+    return clear_interrupt(); 
+
 
     CLEANUP:    
         clear_interrupt(); 
