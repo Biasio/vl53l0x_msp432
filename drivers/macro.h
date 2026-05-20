@@ -2,6 +2,7 @@
 #define __MACRO_H__
 
 #include <stdint.h>
+#include <limits.h>
 #include "config.h"
 
 // Pre-glue macros for correct argument expansion
@@ -21,17 +22,38 @@
         Generally this is ok since it's the fastest available frequency"
 #endif
 
-
-
-static inline void __delay_us(uint32_t us)
+static void __delay_us(uint64_t us)
 {
-    /* Each loop iteration costs ~3 cycles so 3*1000000ULL */
-    uint64_t iterations= ( MCLK_HZ * (uint64_t) us) / 3000000ULL ;
-
-    // maybe too small ms cause a resulting iterations = 0
-    if(!iterations) iterations |= 1; //set iteration to 1
-    while (--iterations) __asm__ volatile ("nop");   // 1 cycle NOP
+    static const uint32_t max_us = (UINT32_MAX * 2000000ULL) / MCLK_HZ;
+    static const uint32_t max_iter = (MCLK_HZ * (uint64_t)max_us) / 2000000ULL;
+    
+    // Delay full chunks of max_us
+    while (us > max_us) {
+        uint32_t iterations = max_iter;
+        __asm__ volatile (
+            "1: subs %0, #1\n"
+            "   bne 1b\n"
+            : "+r" (iterations)
+            :
+            : "cc"
+        );
+        us -= max_us;
+    }
+    
+    // Delay the remaining microseconds (us < max_us)
+    if (us > 0) {
+        uint32_t iterations = (MCLK_HZ * us) / 2000000ULL;
+        if (iterations == 0) iterations = 1;
+        __asm__ volatile (
+            "1: subs %0, #1\n"
+            "   bne 1b\n"
+            : "+r" (iterations)
+            :
+            : "cc"
+        );
+    }
 }
+
 
 //MACRO to wait for a condition and set a temporal limit if this 
 //condition wouldn't occour. The condition, when true, let escape the while
