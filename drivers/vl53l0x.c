@@ -1068,9 +1068,10 @@ static bool configure_LowThresh_interrupt(void)
         goto CLEANUP;
     }
 
+    uint8_t interrupt_mode=0x01;
     // Enable mode 0x01 (below LOW threshold)
     if (!i2c_write(REG_SYSTEM_INTERRUPT_CONFIG_GPIO, 1, 
-                   (uint8_t[]){0x01}, 1)) {
+                   &interrupt_mode, 1)) {
         goto CLEANUP;
     }
 
@@ -1080,7 +1081,7 @@ static bool configure_LowThresh_interrupt(void)
         goto CLEANUP;
     }
 
-    if (check != 0x03) goto CLEANUP;
+    if (check != interrupt_mode) goto CLEANUP;
 
     // Clear any interrupt that may already be pending on the sensor and return.
     return clear_interrupt();
