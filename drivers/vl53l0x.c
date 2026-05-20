@@ -1048,19 +1048,31 @@ static bool configure_LowThresh_interrupt(void)
         return false;
     }
 
+    uint8_t interrupt_status = 0;
+    if (!I2C_POLL_UNTIL(REG_RESULT_INTERRUPT_STATUS, &interrupt_status, 
+            ((interrupt_status & 0x07) == 0), TIMEOUT_POLL))
+    {
+        return false;
+    }
+
+    //The low threshold register is in units of 2mm, so we need to divide the threshold by 2 before writing it to the register. 
+    //Also the value is only stored in the first 12 bits of the register, so we need to mask it with 0x0FFF
+    uint16_t fixed_thresh = (VL53L0X_LOW_THRESH>>1) & 0x0FFF; 
+
     //Write the low threshold. The register is 16-bit big-endian
     uint8_t low_thresh_bytes[2] = {
-        (uint8_t)(VL53L0X_LOW_THRESH >> 8),    // MSB
-        (uint8_t)(VL53L0X_LOW_THRESH & 0xFF)   // LSB
+        (uint8_t)(fixed_thresh >> 8),    // MSB
+        (uint8_t)(fixed_thresh & 0xFF)   // LSB
     };
     if (!i2c_write(REG_SYSTEM_THRESH_LOW, 1, low_thresh_bytes, 2)) {
         return false;
     }
 
+    fixed_thresh = (VL53L0X_HIGH_THRESH>>1) & 0x0FFF; 
     // Write the high threshold
     uint8_t high_thresh_bytes[2] = {
-        (uint8_t)(VL53L0X_HIGH_THRESH >> 8),
-        (uint8_t)(VL53L0X_HIGH_THRESH & 0xFF)
+        (uint8_t)(fixed_thresh >> 8),
+        (uint8_t)(fixed_thresh & 0xFF)
     };
     if (!i2c_write(REG_SYSTEM_THRESH_HIGH, 1, high_thresh_bytes, 2)) {
         return false;
@@ -1084,7 +1096,7 @@ static bool configure_LowThresh_interrupt(void)
 
     // Enable mode 0x01 (below LOW threshold)
     if (!i2c_write(REG_SYSTEM_INTERRUPT_CONFIG_GPIO, 1, 
-                   (uint8_t[]){0x01}, 1)) {
+                   (uint8_t[]){0x03}, 1)) {
         return false;
     }
 
