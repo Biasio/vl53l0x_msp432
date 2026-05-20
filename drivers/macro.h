@@ -33,9 +33,8 @@ static void __delay_us(uint64_t us)
         __asm__ volatile (
             "1: subs %0, #1\n"
             "   bne 1b\n"
-            : "+r" (iterations)
-            :
-            : "cc"
+            : "=r" (iterations)
+            : "0" (iterations)
         );
         us -= MAX_US;
     }
@@ -47,9 +46,8 @@ static void __delay_us(uint64_t us)
         __asm__ volatile (
             "1: subs %0, #1\n"
             "   bne 1b\n"
-            : "+r" (iterations)
-            :
-            : "cc"
+            : "=r" (iterations)
+            : "0" (iterations)
         );
     }
 }
