@@ -30,7 +30,11 @@ static void __delay_us(uint64_t us)
     // Delay full chunks of max_us
     while (us >= MAX_US) {
         uint32_t iterations = UINT32_MAX;
-        asm volatile("1: subs %0, #1\n   bne 1b\n" : "=r"(iterations) : "0"(iterations));
+        asm volatile(
+            "1: subs %0, #1"
+            "bne 1b\n"
+            : "=r"(iterations)
+            : "0"(iterations));
         us -= MAX_US;
     }
 
@@ -38,7 +42,11 @@ static void __delay_us(uint64_t us)
     if (us > 0) {
         uint32_t iterations = ( (MCLK_HZ) * (uint64_t) us )/2000000ULL;
         if (iterations == 0) iterations = 1; // triggered if MCLK_HZ < 2MHz
-        asm volatile("1: subs %0, #1\n   bne 1b\n" : "=r"(iterations) : "0"(iterations));
+        asm volatile(
+            "1: subs %0, #1"
+            "bne 1b\n"
+            : "=r"(iterations)
+            : "0"(iterations));
     }
 }
 
