@@ -18,7 +18,7 @@
 
 #ifndef MCLK_HZ //used for the delay function
     #define MCLK_HZ (48000000UL)    /* 48 MHz default */
-    #warning "MCLK_HZ not specified, defaulting to 48Mhz.\ 
+    #warning "MCLK_HZ not specified, defaulting to 48Mhz. \
         Generally this is ok since it's the fastest available frequency"
 #endif
 
