@@ -1144,13 +1144,6 @@ bool vl53l0x_init()
 
     if (!init_config()) return false; //init config and perform reference calibration
 
-    // Configure the threshold-based interrupt before starting ranging
-    if (!configure_LowThresh_interrupt()) 
-    {
-        clear_interrupt(); 
-        return false;
-    }
-
     return true;
 }
 
@@ -1342,8 +1335,8 @@ bool vl53l0x_start_continuous(void)
         } while (val & 0x01);
     }   
 
-    //clear any pending interrupt
-    if (!clear_interrupt()) goto CLEANUP;
+    // Configure the threshold-based interrupt before starting ranging
+    if (!configure_LowThresh_interrupt()) goto CLEANUP;
 
     // Start continuous ranging
     return i2c_write(REG_SYSRANGE_START, 1, (uint8_t[]){0x02}, 1);
@@ -1364,9 +1357,6 @@ bool vl53l0x_stop_continuous(void)
     do {
         if (!i2c_read(REG_SYSRANGE_START, 1, &val, 1)) goto CLEANUP;
     } while (val & 0x01);
-
-    // clear pending interrupts
-    return clear_interrupt(); 
 
     CLEANUP:    
         clear_interrupt(); 
