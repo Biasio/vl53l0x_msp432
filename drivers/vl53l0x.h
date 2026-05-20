@@ -46,7 +46,7 @@ bool clear_interrupt();
 
 /*
 Triggers a one-off distance measurement and blocks the program execution until the sensor finishes. It then fetches the result and stores the measured distance in the provided variable pointer. */
-bool vl53l0x_read_range_single(uint16_t *range, uint8_t *error_code);
+bool vl53l0x_read_range_single(uint16_t *range);
 
 // Configures the threshold interrupt and then starts the sensor in continuous ranging mode. In this mode the VL53L0X takes measurements autonomously and asserts its INTERRUPT pin whenever a result crosses the threshold.
 bool vl53l0x_start_continuous(void);
@@ -58,7 +58,7 @@ bool vl53l0x_stop_continuous(void);
 
 // Reads the range result from the sensor and then clears the sensor's
 // internal interrupt latch, which physically releases the INTERRUPT pin
-bool vl53l0x_read_range_interrupt(uint16_t *range);
+bool vl53l0x_read_range_interrupt(uint16_t *range, uint8_t *error_code);
 
 
 
