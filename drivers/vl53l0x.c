@@ -882,9 +882,6 @@ static bool configure_interrupt(uint8_t mode)
             (uint8_t[]){gpio_hv_mux_active_high}, 1)) {
         return false;
     }
-
-    if (!clear_interrupt()) return false;
-
     return true;
 }
 
