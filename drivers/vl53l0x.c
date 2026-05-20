@@ -1378,16 +1378,15 @@ bool vl53l0x_stop_continuous(void)
 
 
 
-bool vl53l0x_read_range_interrupt(uint16_t *range)
+bool vl53l0x_read_range_interrupt(uint16_t *range, uint8_t *error_code)
 {
     if(!device_is_booted()) goto CLEANUP; //check if device is booted
 
     // Read the status byte and validate before trusting the range result.
-    uint8_t status_byte;
-    if (!i2c_read(REG_RESULT_RANGE_STATUS, 1, &status_byte, 1)) goto CLEANUP;
+    if (!i2c_read(REG_RESULT_RANGE_STATUS, 1, error_code, 1)) goto CLEANUP;
 
     // Check lower 3 bits
-    if ((status_byte & 0x78) != 0x58) goto CLEANUP;
+    if ((*error_code & 0x78) != 0x58) goto CLEANUP;
 
     // Measurement is valid. Read the 2-byte range result.
     uint8_t buf[2] = {0, 0};
