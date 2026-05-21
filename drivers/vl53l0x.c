@@ -1360,8 +1360,8 @@ bool vl53l0x_init()
 
     if (!init_config()) return false; //init config and perform reference calibration
 
-    //set the timing budget
-    //if(!(vl53l0x_set_timing_budget_us(150000))) return false;
+     // Configure the threshold-based interrupt before starting ranging
+    if (!configure_LowThresh_interrupt()) goto CLEANUP;
 
     return true;
 }
@@ -1370,12 +1370,12 @@ bool vl53l0x_init()
 
 bool clear_interrupt(){
     uint8_t status;
-    uint16_t timeout = 50; // (loop iterations)
+    uint16_t timeout = 5000; // (loop iterations)
+
+    // Clear interrupts
+    if(!i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x01}, 1)) return false;
 
     do {
-        // Clear interrupts
-        if(!i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x01}, 1)) return false;
-        if(!i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x00}, 1)) return false;
         // Read status to check if interrupts were cleared
         if (!i2c_read(REG_RESULT_INTERRUPT_STATUS, 1, &status, 1)) return false;
         if (!(--timeout)) return false;
@@ -1551,9 +1551,6 @@ bool vl53l0x_start_continuous(void)
             if (!i2c_read(REG_SYSRANGE_START, 1, &val, 1)) goto CLEANUP;
         } while (val & 0x01);
     }   
-
-    // Configure the threshold-based interrupt before starting ranging
-    if (!configure_LowThresh_interrupt()) goto CLEANUP;
 
     //restore stop variable
     if (!i2c_write(
