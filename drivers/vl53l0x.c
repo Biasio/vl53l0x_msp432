@@ -1298,7 +1298,7 @@ static bool configure_LowThresh_interrupt(void)
     if (check != interrupt_mode) goto CLEANUP;
 
     // Clear any interrupt that may already be pending on the sensor and return.
-    return clear_interrupt();
+    return true;
 
 
     CLEANUP:
@@ -1361,7 +1361,7 @@ bool vl53l0x_init()
     if (!init_config()) return false; //init config and perform reference calibration
 
      // Configure the threshold-based interrupt before starting ranging
-    if (!configure_LowThresh_interrupt()) goto CLEANUP;
+    if (!configure_LowThresh_interrupt()) return false;
 
     return true;
 }
