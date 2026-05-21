@@ -1167,7 +1167,7 @@ static bool load_interrupt_threshold_tuning(void) {
     while (p[0] != 0) {  // stop when num_bytes is 0x00
         uint8_t num_bytes = p[0];
         uint8_t reg = p[1];
-        uint8_t data[num_bytes] = {0};
+        uint8_t data[4] = {0};
         for (uint8_t i = 0; i < num_bytes; ++i) {
             data[i] = p[2 + i];
         }
