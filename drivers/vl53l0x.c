@@ -860,9 +860,6 @@ static bool load_default_tuning_settings()
     return true;
 }
 
-static void load_interrupt_threshold_tuning(){
-    
-}
 
 static bool configure_interrupt(uint8_t mode)
 {
