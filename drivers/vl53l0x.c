@@ -1166,17 +1166,16 @@ static const uint8_t interrupt_threshold_tuning[] = {
 };
 
 static bool load_interrupt_threshold_tuning(void) {
-    const uint8_t *p = interrupt_threshold_tuning;
-    while (p[0] != 0) {
+    uint8_t* p = interrupt_threshold_tuning;
+    while (p[0] != 0) {  // stop when num_bytes is 0x00
         uint8_t num_bytes = p[0];
         uint8_t reg = p[1];
-        // write num_bytes data bytes from p+2
-        for (uint8_t i = 0; i < num_bytes; i++) {
-            if (!i2c_write(reg, 1, &p[2 + i], 1)) {
-                return false; // fail on any write error
-            }
+        uint8_t data[num_bytes] = {0};
+        for (uint8_t i = 0; i < num_bytes; ++i) {
+            data[i] = p[2 + i];
         }
-        p += 2 + num_bytes;
+        if (!i2c_write(reg, 1, data, num_bytes)) return false;
+        p += 2 + num_bytes; // move to the next setting
     }
     return true;
 }
