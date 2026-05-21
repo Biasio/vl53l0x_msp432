@@ -1012,48 +1012,6 @@ static bool init_config()
 }
 
 
-static bool vl53l0x_set_timing_budget_us(uint32_t budget_us) {
-    // Valid range: 12–200 ms (wrap‑around disabled)
-    if (budget_us < 12000) budget_us = 12000;
-    if (budget_us > 200000) budget_us = 200000;
-
-    // Read final VCSEL period (register 0x70) and convert to PCLKs (periods of the VCSEL pulse)
-    uint8_t reg;
-    if (!i2c_read(REG_FINAL_RANGE_CONFIG_VCSEL_PERIOD, 1, &reg, 1)) return false;
-    uint8_t final_vcsel_pclks = (reg + 1) * 2;
-
-    // Read pre‑range timeouts and VCSEL period
-    uint8_t pre_hi, pre_lo;
-    if (!i2c_read(REG_PRE_RANGE_CONFIG_TIMEOUT_MACROP_HI, 1, &pre_hi, 1)) return false;
-    if (!i2c_read(REG_PRE_RANGE_CONFIG_TIMEOUT_MACROP_LO, 1, &pre_lo, 1)) return false;
-    uint16_t pre_mclks = ((uint16_t)pre_hi << 8) | pre_lo;
-    if (!i2c_read(REG_PRE_RANGE_CONFIG_VCSEL_PERIOD, 1, &reg, 1)) return false;
-    uint8_t pre_vcsel_pclks = (reg + 1) * 2;
-
-    // Macro period in microseconds: (vcsel_pclks * 4608) / (osc_freq_mhz * 1000)
-    // Assume oscillator = 40 MHz without retrieving it. Pre‑range timeout is in us.
-    // macro_period_us = (vcsel_pclks * 4608) / (40 * 1000) = (vcsel_pclks * 576) / 5000
-    uint32_t pre_timeout_us = (uint32_t)pre_mclks * pre_vcsel_pclks * 576 / 5000;
-
-    // Budget left for final range
-    if (budget_us <= pre_timeout_us) budget_us = pre_timeout_us + 2000;
-    uint32_t final_timeout_us = budget_us - pre_timeout_us;
-
-    // Convert final timeout to macro periods
-    // macro_clks = (timeout_us * 5000) / (final_vcsel_pclks * 576)
-    uint32_t macro_clks = (final_timeout_us * 5000) / (final_vcsel_pclks * 576);
-    if (macro_clks > 0xFFFF) macro_clks = 0xFFFF;
-    uint16_t final_mclks = (uint16_t)macro_clks;
-
-    // Write final range timeout registers (high/low)
-    uint8_t final_hi = final_mclks >> 8;
-    uint8_t final_lo = final_mclks & 0xFF;
-    if (!i2c_write(REG_FINAL_RANGE_CONFIG_TIMEOUT_MACROP_HI, 1, &final_hi, 1)) return false;
-    if (!i2c_write(REG_FINAL_RANGE_CONFIG_TIMEOUT_MACROP_LO, 1, &final_lo, 1)) return false;
-
-    return true;
-}
-
 static const uint8_t interrupt_threshold_tuning[] = {
     // Start of Interrupt Threshold Settings (from ST API)
     0x01, 0xff, 0x00,
@@ -1298,7 +1256,7 @@ static bool configure_LowThresh_interrupt(void)
     if (check != interrupt_mode) goto CLEANUP;
 
     // Clear any interrupt that may already be pending on the sensor and return.
-    return true;
+    return clear_interrupt();
 
 
     CLEANUP:
@@ -1552,14 +1510,6 @@ bool vl53l0x_start_continuous(void)
         do {
             if (!i2c_read(REG_SYSRANGE_START, 1, &val, 1)) goto CLEANUP;
         } while (val & 0x01);
-    }   
-
-    //restore stop variable
-    if (!i2c_write(
-            REG_INTERNAL_TUNING_1, 1, 
-            (uint8_t[]){stop_variable}, 1)) 
-    {
-        goto CLEANUP;
     }
     
         // Start continuous ranging
