@@ -1360,9 +1360,6 @@ bool vl53l0x_init()
 
     if (!init_config()) return false; //init config and perform reference calibration
 
-     // Configure the threshold-based interrupt before starting ranging
-    if (!configure_LowThresh_interrupt()) return false;
-
     return true;
 }
 
@@ -1374,6 +1371,7 @@ bool clear_interrupt(){
 
     // Clear interrupts
     if(!i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x01}, 1)) return false;
+    if (!i2c_write(REG_SYSTEM_INTERRUPT_CLEAR, 1, (uint8_t[]){0x00}, 1)) return false;
 
     do {
         // Read status to check if interrupts were cleared
@@ -1497,6 +1495,9 @@ bool vl53l0x_read_range_single(uint16_t *range)
 bool vl53l0x_start_continuous(void)
 {
     if(!device_is_booted()) goto CLEANUP; //check if device is booted
+
+    // Configure the threshold-based interrupt before starting ranging
+    if (!configure_LowThresh_interrupt()) goto CLEANUP;
 
     if (!i2c_write(
         REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
