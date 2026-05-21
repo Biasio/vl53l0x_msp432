@@ -1360,6 +1360,9 @@ bool vl53l0x_init()
 
     if (!init_config()) return false; //init config and perform reference calibration
 
+    //set the timing budget
+    if(!(vl53l0x_set_timing_budget_us(150000))) return false;
+
     return true;
 }
 
@@ -1493,9 +1496,6 @@ bool vl53l0x_read_range_single(uint16_t *range)
 bool vl53l0x_start_continuous(void)
 {
     if(!device_is_booted()) goto CLEANUP; //check if device is booted
-
-    //set the timing budget
-    if(!(vl53l0x_set_timing_budget_us(150000))) goto CLEANUP;
 
     if (!i2c_write(
         REG_POWER_MANAGEMENT_GO1_POWER_FORCE , 1, 
