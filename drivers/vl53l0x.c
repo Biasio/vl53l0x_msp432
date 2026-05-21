@@ -1379,6 +1379,7 @@ bool clear_interrupt(){
         // Read status to check if interrupts were cleared
         if (!i2c_read(REG_RESULT_INTERRUPT_STATUS, 1, &status, 1)) return false;
         if (!(--timeout)) return false;
+        delay_us(50);
     } while ((status & 0x07) != 0);
 
     return true;
