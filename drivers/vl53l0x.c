@@ -1361,7 +1361,7 @@ bool vl53l0x_init()
     if (!init_config()) return false; //init config and perform reference calibration
 
     //set the timing budget
-    if(!(vl53l0x_set_timing_budget_us(150000))) return false;
+    //if(!(vl53l0x_set_timing_budget_us(150000))) return false;
 
     return true;
 }
