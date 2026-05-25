@@ -980,6 +980,8 @@ bool vl53l0x_read_range_interrupt(uint16_t *range, uint8_t *error_code)
     
     *range = ((uint16_t)buf[0] << 8) | buf[1];
 
+    *range -= VL53L0X_RANGE_OFFSET;
+
     // Normalize out-of-range sentinel values (8190/8191 means "no target")
     if (*range >= 8190) {
         *range = VL53L0X_OUT_OF_RANGE;

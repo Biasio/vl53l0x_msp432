@@ -19,6 +19,8 @@
 #define VL53L0X_LOW_THRESH (700U)
 #define VL53L0X_HIGH_THRESH (0xFFFFU)
 
+#define VL53L0X_RANGE_OFFSET (41U) // in mm, to be subtracted from the measured range
+
 #define VL53L0X_INT_POLARITY 0  // 0 = active-low; 1 = active-high
 
 #define SMCLK_HZ (12000000UL) // SMCLK frequency in Hz
