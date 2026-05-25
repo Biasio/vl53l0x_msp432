@@ -779,6 +779,39 @@ static bool configure_LowThresh_interrupt(void)
 
 
 
+
+
+static bool vl53l0x_set_signal_rate_limit(float limit_mcps)
+{
+    if (limit_mcps < 0.0f) return false;
+
+    // Convert to Q9.7 format: value = limit_mcps * 128
+    uint16_t limit_q97 = (uint16_t)(limit_mcps * 128.0f);
+
+    // Write as big-endian 16-bit to registers 0x44 (MSB) and 0x45 (LSB)
+    uint8_t buf[2] = {
+        (uint8_t)(limit_q97 >> 8),
+        (uint8_t)(limit_q97 & 0xFF)
+    };
+    if (!i2c_write(REG_FINAL_RANGE_CONFIG_MIN_COUNT_RATE_RTN_LIMIT, 1, buf, 2))
+        return false;
+
+    return true;
+}
+
+
+
+
+static bool set_final_range_timeout_macro(uint16_t macro_value)
+{
+    uint8_t buf[2] = {
+        (uint8_t)(macro_value >> 8),
+        (uint8_t)(macro_value & 0xFF)
+    };
+    return i2c_write(REG_FINAL_RANGE_CONFIG_TIMEOUT_MACROP_HI, 1, buf, 2);
+}
+
+
 void interrupt_gpio_init(void){
     PORT(VL53L0X_INT_PORT)->SEL0 &= ~ONE_HOT_BIT(VL53L0X_INT_PIN);  
     PORT(VL53L0X_INT_PORT)->SEL1 &= ~ONE_HOT_BIT(VL53L0X_INT_PIN);
@@ -862,6 +895,8 @@ bool vl53l0x_start_continuous(void)
 
     // Configure the threshold-based interrupt before starting ranging
     if (!configure_LowThresh_interrupt()) goto CLEANUP;
+
+    vl53l0x_set_ambient_light_mode(1); //medium ambient light mode to improve performance in bright environment
 
     static const uint8_t start_conitnuous_seq_pre[] = {
         0x01, REG_POWER_MANAGEMENT_GO1_POWER_FORCE, 0x01,
@@ -957,3 +992,30 @@ bool vl53l0x_read_range_interrupt(uint16_t *range, uint8_t *error_code)
         clear_interrupt(); 
         return false;
 }
+
+
+
+
+
+bool vl53l0x_set_ambient_light_mode(uint8_t level)
+{
+    bool ok = true;
+
+    switch (level)
+    {
+        case 0:  //  (dark / normal indoor)
+            ok &= vl53l0x_set_signal_rate_limit(0.25f);
+            break;
+        case 1:  // (medium light ambient)
+            ok &= vl53l0x_set_signal_rate_limit(0.5f);
+            break;
+        case 2:  // (direct sunlight)
+            ok &= vl53l0x_set_signal_rate_limit(0.75f);
+            break;
+        default:
+            return false;
+    }
+
+    return ok;
+}
+
