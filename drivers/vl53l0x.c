@@ -844,6 +844,17 @@ static bool vl53l0x_set_timing_budget(uint32_t budget_us)
     // Minimum budget from datasheet
     if (budget_us < 20000) budget_us = 20000;
 
+    //stop measurements
+    uint8_t range_start;
+    if (i2c_read(REG_SYSRANGE_START, 1, &range_start, 1) && (range_start & 0x01)) {
+        was_running = true;
+        vl53l0x_stop_continuous();
+    }
+
+    //select correct register bank
+    if(!i2c_write(REG_INTERNAL_TUNING_2, 1, 0x00, 1)) return false;
+
+
     // From ST API
     const uint32_t START_OVERHEAD_US = 1910;
     const uint32_t END_OVERHEAD_US   = 960;
@@ -974,7 +985,7 @@ bool vl53l0x_start_continuous(void)
 
     // Set to medium ambient mode as a reasonable default for interrupt-based ranging
     if(!vl53l0x_set_ambient_light_mode(1)) goto CLEANUP;
-    
+
     // Configure the threshold-based interrupt before starting ranging
     if (!configure_LowThresh_interrupt()) goto CLEANUP;
 
