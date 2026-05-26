@@ -60,6 +60,9 @@ bool vl53l0x_stop_continuous(void);
 // internal interrupt latch, which physically releases the INTERRUPT pin
 bool vl53l0x_read_range_interrupt(uint16_t *range, uint8_t *error_code);
 
+// Configures the ambient light mode for the sensor
+bool vl53l0x_set_ambient_light_mode(uint8_t level);
+
 
 
 

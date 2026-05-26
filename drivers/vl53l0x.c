@@ -811,6 +811,85 @@ static bool set_final_range_timeout_macro(uint16_t macro_value)
 }
 
 
+/* Decode a 16-bit encoded timeout to a 32-bit value */
+static uint32_t decode_timeout(uint16_t encoded)
+{
+    return ((uint32_t)(encoded & 0x00FF) << ((encoded & 0xFF00) >> 8)) + 1;
+}
+
+
+/* Encode a timeout in macro periods into the 16-bit register format */
+static uint16_t encode_timeout(uint32_t timeout_mclks)
+{
+    uint32_t ls_byte = 0;
+    uint16_t ms_byte = 0;
+    if (timeout_mclks > 0) {
+        ls_byte = timeout_mclks - 1;
+        while ((ls_byte & 0xFFFFFF00) > 0) {
+            ls_byte >>= 1;
+            ms_byte++;
+        }
+    }
+    return (ms_byte << 8) | (uint16_t)(ls_byte & 0xFF);
+}
+
+
+
+// Configures the sensor's internal timing budget, which is the total time allocated for a 
+// single distance measurement. Longer budgets allow more signal averaging and improve accuracy, 
+// especially in bright conditions, but reduce the maximum measurement rate. 
+// The budget is specified in microseconds and must be at least 20 ms according to the datasheet.
+static bool vl53l0x_set_timing_budget(uint32_t budget_us)
+{
+    // Minimum budget from datasheet
+    if (budget_us < 20000) budget_us = 20000;
+
+    // From ST API
+    const uint32_t START_OVERHEAD_US = 1910;
+    const uint32_t END_OVERHEAD_US   = 960;
+    const uint32_t PRE_RANGE_OVERHEAD_US = 660;
+
+    // Read the current pre‑range timeout
+    uint8_t buf[2];
+    if (!i2c_read(REG_PRE_RANGE_CONFIG_TIMEOUT_MACROP_HI, 1, buf, 2))
+        return false;
+    uint16_t pre_encoded = ((uint16_t)buf[0] << 8) | buf[1];
+    uint32_t pre_mclks = decode_timeout(pre_encoded);
+
+    // Get pre‑range VCSEL period (in PLL clocks)
+    uint8_t vcsel_period_reg = 0;
+    if (!i2c_read(REG_PRE_RANGE_CONFIG_VCSEL_PERIOD, 1, &vcsel_period_reg, 1))
+        return false;
+    uint8_t vcsel_pclks = (vcsel_period_reg + 1) << 1;  // decode
+
+    // Convert pre‑range timeout from macro periods to microseconds
+    uint32_t macro_period_ps = 1655UL * 2304UL * vcsel_pclks;
+    uint32_t macro_period_us = (macro_period_ps + 500) / 1000;
+    uint32_t pre_timeout_us = (pre_mclks * macro_period_us + 500) / 1000;
+
+    // Calculate final range timeout in microseconds
+    uint32_t final_timeout_us = budget_us - (START_OVERHEAD_US + END_OVERHEAD_US +
+                                             pre_timeout_us + PRE_RANGE_OVERHEAD_US);
+    if (final_timeout_us < 500) final_timeout_us = 500;  // safety minimum
+
+    // Convert final timeout to macro periods using final‑range VCSEL period
+    if (!i2c_read(REG_FINAL_RANGE_CONFIG_VCSEL_PERIOD, 1, &vcsel_period_reg, 1))
+        return false;
+    vcsel_pclks = (vcsel_period_reg + 1) << 1;
+    macro_period_ps = 1655UL * 2304UL * vcsel_pclks;
+    macro_period_us = (macro_period_ps + 500) / 1000;
+    uint32_t final_mclks = (final_timeout_us * 1000 + macro_period_us/2) / macro_period_us;
+    uint16_t final_encoded = encode_timeout(final_mclks);
+
+    // Write final range timeout (big‑endian)
+    uint8_t final_buf[2] = { (uint8_t)(final_encoded >> 8), (uint8_t)(final_encoded & 0xFF) };
+
+    if (!i2c_write(REG_FINAL_RANGE_CONFIG_TIMEOUT_MACROP_HI, 1, final_buf, 2)) return false;
+
+    return true;
+}
+
+
 
 void interrupt_gpio_init(void){
     PORT(VL53L0X_INT_PORT)->SEL0 &= ~ONE_HOT_BIT(VL53L0X_INT_PIN);  
@@ -864,7 +943,7 @@ bool vl53l0x_init()
 
     if (!init_config()) return false; //init config and perform reference calibration
 
-    return true;
+    return vl53l0x_set_ambient_light_mode(1); //medium ambient light mode to improve performance in bright environment
 }
 
 
@@ -895,8 +974,6 @@ bool vl53l0x_start_continuous(void)
 
     // Configure the threshold-based interrupt before starting ranging
     if (!configure_LowThresh_interrupt()) goto CLEANUP;
-
-    vl53l0x_set_ambient_light_mode(1); //medium ambient light mode to improve performance in bright environment
 
     static const uint8_t start_conitnuous_seq_pre[] = {
         0x01, REG_POWER_MANAGEMENT_GO1_POWER_FORCE, 0x01,
@@ -1007,12 +1084,15 @@ bool vl53l0x_set_ambient_light_mode(uint8_t level)
     {
         case 0:  //  (dark / normal indoor)
             ok &= vl53l0x_set_signal_rate_limit(0.3f);
+            ok &= vl53l0x_set_timing_budget(33000);
             break;
         case 1:  // (medium light ambient)
             ok &= vl53l0x_set_signal_rate_limit(0.6f);
+            ok &= vl53l0x_set_timing_budget(66000);
             break;
         case 2:  // (direct sunlight)
             ok &= vl53l0x_set_signal_rate_limit(0.75f);
+            ok &= vl53l0x_set_timing_budget(200000);
             break;
         default:
             return false;
