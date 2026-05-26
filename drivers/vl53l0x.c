@@ -785,7 +785,7 @@ static bool vl53l0x_set_signal_rate_limit(float limit_mcps)
 {
     if (limit_mcps < 0.0f) return false;
 
-    // Convert to Q9.7 format: value = limit_mcps * 128
+    // Convert to Q9.7 format
     uint16_t limit_q97 = (uint16_t)(limit_mcps * 128.0f);
 
     // Write as big-endian 16-bit to registers 0x44 (MSB) and 0x45 (LSB)
@@ -793,8 +793,7 @@ static bool vl53l0x_set_signal_rate_limit(float limit_mcps)
         (uint8_t)(limit_q97 >> 8),
         (uint8_t)(limit_q97 & 0xFF)
     };
-    if (!i2c_write(REG_FINAL_RANGE_CONFIG_MIN_COUNT_RATE_RTN_LIMIT, 1, buf, 2))
-        return false;
+    if (!i2c_write(REG_FINAL_RANGE_CONFIG_MIN_COUNT_RATE_RTN_LIMIT, 1, buf, 2)) return false;
 
     return true;
 }
@@ -810,6 +809,7 @@ static bool set_final_range_timeout_macro(uint16_t macro_value)
     };
     return i2c_write(REG_FINAL_RANGE_CONFIG_TIMEOUT_MACROP_HI, 1, buf, 2);
 }
+
 
 
 void interrupt_gpio_init(void){
@@ -1006,10 +1006,10 @@ bool vl53l0x_set_ambient_light_mode(uint8_t level)
     switch (level)
     {
         case 0:  //  (dark / normal indoor)
-            ok &= vl53l0x_set_signal_rate_limit(0.25f);
+            ok &= vl53l0x_set_signal_rate_limit(0.3f);
             break;
         case 1:  // (medium light ambient)
-            ok &= vl53l0x_set_signal_rate_limit(0.5f);
+            ok &= vl53l0x_set_signal_rate_limit(0.6f);
             break;
         case 2:  // (direct sunlight)
             ok &= vl53l0x_set_signal_rate_limit(0.75f);
