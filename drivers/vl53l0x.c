@@ -1062,8 +1062,9 @@ bool vl53l0x_read_range_interrupt(uint16_t *range, uint8_t *error_code)
     // Read the status byte and validate before trusting the range result.
     if (!i2c_read(REG_RESULT_RANGE_STATUS, 1, error_code, 1)) goto CLEANUP;
 
-    // Check lower 3 bits
-    if ((*error_code & 0x78) != 0x58) goto CLEANUP;
+    // Extract device error (bits 7:3)
+    uint8_t device_error = (*error_code >> 3) & 0x0F;
+    if (device_error != 0) goto CLEANUP;   // Not a valid measurement
 
     // Measurement is valid. Read the 2-byte range result.
     uint8_t buf[2] = {0, 0};
@@ -1097,11 +1098,11 @@ bool vl53l0x_set_ambient_light_mode(uint8_t level)
     switch (level)
     {
         case 0:  //  (dark / normal indoor)
-            ok &= vl53l0x_set_signal_rate_limit(0.3f);
+            ok &= vl53l0x_set_signal_rate_limit(0.25f);
             ok &= vl53l0x_set_timing_budget(33000);
             break;
         case 1:  // (medium light ambient)
-            ok &= vl53l0x_set_signal_rate_limit(0.6f);
+            ok &= vl53l0x_set_signal_rate_limit(0.45f);
             ok &= vl53l0x_set_timing_budget(66000);
             break;
         case 2:  // (direct sunlight)
