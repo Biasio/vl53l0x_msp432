@@ -846,8 +846,8 @@ static bool vl53l0x_set_timing_budget(uint32_t budget_us)
 
     //stop measurements
     uint8_t range_start;
-    if (i2c_read(REG_SYSRANGE_START, 1, &range_start, 1) && (range_start & 0x01)) {
-        was_running = true;
+    if (i2c_read(REG_SYSRANGE_START, 1, &range_start, 1) && (range_start & 0x01)) 
+    {
         vl53l0x_stop_continuous();
     }
 
