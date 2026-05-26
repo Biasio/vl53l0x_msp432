@@ -1064,7 +1064,7 @@ bool vl53l0x_read_range_interrupt(uint16_t *range, uint8_t *error_code)
 
     // Extract device error (bits 7:3)
     uint8_t device_error = (*error_code >> 3) & 0x0F;
-    if (device_error != 0) goto CLEANUP;   // Not a valid measurement
+    if (device_error != 11) goto CLEANUP;   // Not a valid measurement (RANGECOMPLETE=11)
 
     // Measurement is valid. Read the 2-byte range result.
     uint8_t buf[2] = {0, 0};
