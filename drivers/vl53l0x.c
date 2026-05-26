@@ -943,7 +943,7 @@ bool vl53l0x_init()
 
     if (!init_config()) return false; //init config and perform reference calibration
 
-    return vl53l0x_set_ambient_light_mode(1); //medium ambient light mode to improve performance in bright environment
+    return true;
 }
 
 
@@ -972,6 +972,9 @@ bool vl53l0x_start_continuous(void)
 {
     if(!device_is_booted()) goto CLEANUP; //check if device is booted
 
+    // Set to medium ambient mode as a reasonable default for interrupt-based ranging
+    if(!vl53l0x_set_ambient_light_mode(1)) goto CLEANUP;
+    
     // Configure the threshold-based interrupt before starting ranging
     if (!configure_LowThresh_interrupt()) goto CLEANUP;
 
