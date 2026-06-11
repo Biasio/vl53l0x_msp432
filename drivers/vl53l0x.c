@@ -939,7 +939,7 @@ bool xshut_toggle(bool state)
     if(state) 
     {
         PORT(XSHUT_PORT)->OUT |= ONE_HOT_BIT(XSHUT_PIN); //ON
-        return WAIT_UNTIL(device_is_booted(), 25000);
+        return WAIT_UNTIL(device_is_booted(), 1000);
     }
     else 
     {
