@@ -936,10 +936,16 @@ void xshut_gpio_init(void)
 
 bool xshut_toggle(bool state)
 {
-    if(state) PORT(XSHUT_PORT)->OUT |= ONE_HOT_BIT(XSHUT_PIN); //ON
-    else PORT(XSHUT_PORT)->OUT &= ~ONE_HOT_BIT(XSHUT_PIN); //OFF
-
-    return WAIT_UNTIL(device_is_booted(), 25000);
+    if(state) 
+    {
+        PORT(XSHUT_PORT)->OUT |= ONE_HOT_BIT(XSHUT_PIN); //ON
+        return WAIT_UNTIL(device_is_booted(), 25000);
+    }
+    else 
+    {
+        PORT(XSHUT_PORT)->OUT &= ~ONE_HOT_BIT(XSHUT_PIN); //OFF
+        return true;
+    }
 }
 
 
