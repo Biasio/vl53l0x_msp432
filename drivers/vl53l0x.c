@@ -944,6 +944,7 @@ bool xshut_toggle(bool state)
     else 
     {
         PORT(XSHUT_PORT)->OUT &= ~ONE_HOT_BIT(XSHUT_PIN); //OFF
+        __delay_us(3000);
         return true;
     }
 }
