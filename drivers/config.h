@@ -16,7 +16,7 @@
 
 #define VL53L0X_ADDRESS (0x29)
 
-#define VL53L0X_LOW_THRESH (400U)
+#define VL53L0X_LOW_THRESH (200U)
 #define VL53L0X_HIGH_THRESH (0xFFFFU)
 
 #define VL53L0X_RANGE_OFFSET (41U) // in mm, to be subtracted from the measured range

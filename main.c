@@ -121,7 +121,16 @@ int main(void) {
                     PORT(LED_PORT_NUM)->OUT |= ONE_HOT_BIT(LED_PIN_NUM);
                     __delay_us(100000);
                     PORT(LED_PORT_NUM)->OUT &= ~ONE_HOT_BIT(LED_PIN_NUM);
+                    printf("Valid presence detected! Range: %d mm\n", range);
                 }
+                else
+                {
+                    printf("Validation Failed: Object out of range (%d mm).\n", range);
+                }
+            }
+            else
+            {
+                printf("Validation Failed: Sensor error code %d\n", error_code);
             }
 
             PORT(VL53L0X_INT_PORT)->IE  |= ONE_HOT_BIT(VL53L0X_INT_PIN);
