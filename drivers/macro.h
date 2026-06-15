@@ -23,7 +23,7 @@
 #endif
 
 
-#define MAX_US (((UINT32_MAX) * 7000000ULL) / (MCLK_HZ))
+#define MAX_US (((UINT32_MAX) * 9000000ULL) / (MCLK_HZ))
 
 static void __delay_us(uint64_t us)
 {
@@ -36,7 +36,7 @@ static void __delay_us(uint64_t us)
 
     // Delay the remaining microseconds (us < MAX_US)
     if (us > 0) {
-        volatile uint32_t iterations = ( (MCLK_HZ) * (uint64_t) us )/7000000ULL;
+        volatile uint32_t iterations = ( (MCLK_HZ) * (uint64_t) us )/9000000ULL;
         if (iterations == 0) iterations = 1; // triggered if MCLK_HZ < 2MHz
         while (iterations--);
     }
